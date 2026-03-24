@@ -1,0 +1,26 @@
+info:
+  name: edit-profile
+  type: http
+  seq: 3
+
+http:
+  method: PUT
+  url: http://localhost:3000/api/edit-profile
+  headers:
+    - name: set-cookie
+      value: access_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6InBvckBnbWFpbC5jb20iLCJleHAiOjE3NzQ0NTQwNjQsImlhdCI6MTc3NDM2NzY2NCwicm9sZSI6InVzZXIiLCJ1c2VyX2lkIjo0fQ.ucoKVK_G2iut21VoGR0_kDJCRbbY6Yqd4Y2c2uH88wA; expires=Tue, 31 Mar 2026 15:54:24 GMT; path=/; HttpOnly; SameSite=Lax
+  body:
+    type: json
+    data: |-
+      {
+        "name" : "ชัชวาลย์ จันทร์กล่ำ",
+        "phone": "0957712223",
+        "avatar": "https://www.w3schools.com/tags/img_girl.jpg"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

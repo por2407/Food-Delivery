@@ -1,0 +1,22 @@
+info:
+  name: login
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: http://localhost:3000/api/login
+  body:
+    type: json
+    data: |-
+      {
+        "email" : "por@gmail.com",
+        "password": "por123456789"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

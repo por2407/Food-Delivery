@@ -1,0 +1,177 @@
+package service
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"food_delivery/config"
+	"food_delivery/internal/core/domain"
+	"food_delivery/internal/core/ports"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+	"golang.org/x/crypto/bcrypt"
+)
+
+type AuthService struct {
+	repo ports.AuthRepository
+	cfg  *config.Config
+}
+
+func NewAuthService(repo ports.AuthRepository, cfg *config.Config) *AuthService {
+	return &AuthService{repo: repo, cfg: cfg}
+}
+
+func (s *AuthService) Register(ctx context.Context, req ports.RegisterRequest) (*ports.RegisterRequest, error) {
+	// Check if user already exists
+	existingUser, err := s.repo.FindUserByEmail(ctx, req.Email)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check existing user: %w", err)
+	}
+	if existingUser != nil {
+		return nil, errors.New("email already in use")
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	// Default role กำหนดที่ service layer (business logic ไม่ใช่ repo)
+	if err := s.repo.RegisterUser(ctx, &domain.User{
+		Email:    req.Email,
+		Password: string(hashedPassword),
+		Name:     req.Name,
+		Role:     "user",
+	}); err != nil {
+		return nil, fmt.Errorf("failed to register user: %w", err)
+	}
+
+	return &req, nil
+}
+
+func (s *AuthService) generateToken(user *domain.User, secret string, expiry time.Duration) (string, error) {
+	claims := jwt.MapClaims{
+		"user_id": user.ID,
+		"email":   user.Email,
+		"role":    user.Role,
+		"exp":     time.Now().Add(expiry).Unix(),
+		"iat":     time.Now().Unix(),
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(secret))
+}
+
+func (s *AuthService) Login(ctx context.Context, req ports.LoginRequest) (*ports.LoginResponse, error) {
+	user, err := s.repo.FindUserByEmail(ctx, req.Email)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find user: %w", err)
+	}
+	if user == nil {
+		return nil, errors.New("user not found")
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
+		return nil, errors.New("invalid credentials")
+	}
+
+	// Access token: 7 วัน → ส่งเป็น Cookie
+	accessToken, err := s.generateToken(user, s.cfg.JWT.Secret,
+		time.Duration(s.cfg.JWT.ExpireHours)*time.Hour)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate access token: %w", err)
+	}
+
+	return &ports.LoginResponse{
+		AccessToken: accessToken,
+		Info: ports.InfoResponse{
+			Name:   user.Name,
+			Email:  user.Email,
+			Role:   user.Role,
+			Phone:  user.Phone,
+			Avatar: user.Avatar,
+		},
+	}, nil
+}
+
+func (s *AuthService) EditProfileByID(ctx context.Context, userID int, req ports.EditProfileRequest) (*ports.InfoResponse, error) {
+	user := &domain.User{
+		ID:     userID,
+		Name:   req.Name,
+		Phone:  req.Phone,
+		Avatar: req.Avatar,
+	}
+
+	if err := s.repo.EditProfileByID(ctx, user); err != nil {
+		return nil, fmt.Errorf("failed to edit profile: %w", err)
+	}
+
+	// ประกอบ response จาก req + JWT locals (email, role)
+	// ไม่ต้อง query DB อีกรอบ เพราะ email/role ไม่มีการเปลี่ยนแปลง
+	return &ports.InfoResponse{
+		Name:   req.Name,
+		Email:  req.Email,
+		Role:   req.Role,
+		Phone:  req.Phone,
+		Avatar: req.Avatar,
+	}, nil
+}
+
+// ChangePassword → login อยู่แล้ว ยืนยันรหัสเก่าก่อน
+func (s *AuthService) ChangePassword(ctx context.Context, userID int, req ports.ChangePasswordRequest) error {
+	// ดึง user จาก DB เพื่อเอา hashed password เก่ามาตรวจ
+	user, err := s.repo.FindUserByID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("failed to find user: %w", err)
+	}
+	if user == nil {
+		return errors.New("user not found")
+	}
+
+	// ตรวจสอบรหัสผ่านเก่า
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.OldPassword)); err != nil {
+		return errors.New("old password is incorrect")
+	}
+
+	// ห้ามตั้งรหัสเดิม
+	if req.OldPassword == req.NewPassword {
+		return errors.New("new password must be different from old password")
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	if err := s.repo.UpdatePasswordByID(ctx, userID, string(hashedPassword)); err != nil {
+		return fmt.Errorf("failed to update password: %w", err)
+	}
+	return nil
+}
+
+// ResetPassword → login ไม่ได้ ยืนยัน email + เบอร์โทรแทน
+func (s *AuthService) ResetPassword(ctx context.Context, req ports.ResetPasswordRequest) error {
+	// หา user ด้วย email
+	user, err := s.repo.FindUserByEmail(ctx, req.Email)
+	if err != nil {
+		return fmt.Errorf("failed to find user: %w", err)
+	}
+	if user == nil {
+		return errors.New("email or phone number is incorrect")
+	}
+
+	// ตรวจสอบเบอร์โทรตรงกับ DB ไหม (ข้อความ error เดียวกัน เพื่อไม่บอก attacker ว่าอันไหนผิด)
+	if user.Phone != req.Phone {
+		return errors.New("email or phone number is incorrect")
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	if err := s.repo.UpdatePasswordByID(ctx, user.ID, string(hashedPassword)); err != nil {
+		return fmt.Errorf("failed to reset password: %w", err)
+	}
+	return nil
+}
