@@ -20,4 +20,5 @@ type Restaurant struct {
 	Is_active   bool      `gorm:"column:is_active" json:"is_active"`
 	CreatedAt   time.Time `gorm:"column:created_at" json:"created_at"`
 	UpdatedAt   time.Time `gorm:"column:updated_at" json:"updated_at"`
+	Status      string    `gorm:"column:status;default:'Y'" json:"status"`
 }

@@ -35,6 +35,17 @@ func (r *RestaurantRepository) FindRestaurantByID(ctx context.Context, id int) (
 	return &restaurant, nil
 }
 
+func (r *RestaurantRepository) FindRestaurantByOwnerID(ctx context.Context, ownerID int) (*domain.Restaurant, error) {
+	var restaurant domain.Restaurant
+	if err := r.db.WithContext(ctx).Where("owner_id = ?", ownerID).First(&restaurant).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &restaurant, nil
+}
+
 func (r *RestaurantRepository) EditRestaurant(ctx context.Context, restaurant *domain.Restaurant) error {
 	result := r.db.WithContext(ctx).Model(&domain.Restaurant{}).Where("id = ?", restaurant.ID).Updates(map[string]interface{}{
 		"name":        restaurant.Name,
@@ -59,7 +70,7 @@ func (r *RestaurantRepository) EditRestaurant(ctx context.Context, restaurant *d
 
 func (r *RestaurantRepository) FindAllRestaurants(ctx context.Context) ([]*domain.Restaurant, error) {
 	var restaurants []*domain.Restaurant
-	if err := r.db.WithContext(ctx).Find(&restaurants).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("status = ?", "Y").Find(&restaurants).Error; err != nil {
 		return nil, err
 	}
 

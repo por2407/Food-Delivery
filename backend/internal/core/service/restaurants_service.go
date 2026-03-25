@@ -16,6 +16,14 @@ func NewRestaurantService(restaurantRepo ports.RestaurantRepository) *Restaurant
 }
 
 func (s *RestaurantService) AddRestaurant(ctx context.Context, ownerID int, req ports.CreateRestaurantRequest) (*ports.RestaurantResponse, error) {
+	existing, err := s.restaurantRepo.FindRestaurantByOwnerID(ctx, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	if existing != nil {
+		return nil, errors.New("you have already registered a restaurant")
+	}
+
 	restaurant := &domain.Restaurant{
 		OwnerID:     ownerID,
 		Name:        req.Name,

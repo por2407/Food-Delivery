@@ -75,7 +75,27 @@ func (h *RestaurantHandler) EditRestaurant(c *fiber.Ctx) error {
 }
 
 func (h *RestaurantHandler) GetRestaurantAll(c *fiber.Ctx) error {
+	result, err := h.restaurantService.GetRestaurantAll(c.Context())
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
 	return c.JSON(fiber.Map{
-		"message": "Get all restaurants - not implemented yet",
+		"message": "Get all restaurants successfully",
+		"data":    result,
+	})
+}
+
+func (h *RestaurantHandler) CloseRestaurant(c *fiber.Ctx) error {
+	// ดึง restaurant ID จาก URL param :id
+	restaurantID, err := c.ParamsInt("id")
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid restaurant ID",
+		})
+
+	}
+	return c.JSON(fiber.Map{
+		"message": "Close restaurant successfully",
+		"data":    restaurantID,
 	})
 }

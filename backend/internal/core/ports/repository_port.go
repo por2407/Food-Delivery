@@ -17,6 +17,7 @@ type AuthRepository interface {
 type RestaurantRepository interface {
 	CreateRestaurant(ctx context.Context, restaurant *domain.Restaurant) error
 	FindRestaurantByID(ctx context.Context, id int) (*domain.Restaurant, error)
+	FindRestaurantByOwnerID(ctx context.Context, ownerID int) (*domain.Restaurant, error)
 	EditRestaurant(ctx context.Context, restaurant *domain.Restaurant) error
 	FindAllRestaurants(ctx context.Context) ([]*domain.Restaurant, error)
 }
