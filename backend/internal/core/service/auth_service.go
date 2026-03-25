@@ -42,7 +42,7 @@ func (s *AuthService) Register(ctx context.Context, req ports.RegisterRequest) (
 		Email:    req.Email,
 		Password: string(hashedPassword),
 		Name:     req.Name,
-		Role:     "user",
+		Role:     req.Role,
 	}); err != nil {
 		return nil, fmt.Errorf("failed to register user: %w", err)
 	}
@@ -174,4 +174,19 @@ func (s *AuthService) ResetPassword(ctx context.Context, req ports.ResetPassword
 		return fmt.Errorf("failed to reset password: %w", err)
 	}
 	return nil
+}
+
+func (s *AuthService) GetProfile(ctx context.Context, userID int) (*ports.InfoResponse, error) {
+	user, err := s.repo.FindProfileByID(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find user profile: %w", err)
+	}
+
+	return &ports.InfoResponse{
+		Name:   user.Name,
+		Email:  user.Email,
+		Role:   user.Role,
+		Phone:  user.Phone,
+		Avatar: user.Avatar,
+	}, nil
 }

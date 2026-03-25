@@ -2,6 +2,7 @@ package ports
 
 import (
 	"context"
+	"time"
 )
 
 type RegisterRequest struct {
@@ -9,6 +10,7 @@ type RegisterRequest struct {
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required,min=6"`
 	Phone    string `json:"phone" validate:"required,min=10,max=10,numeric"`
+	Role     string `json:"role" validate:"required,oneof=user rest admin rider"`
 }
 
 type LoginRequest struct {
@@ -57,4 +59,52 @@ type AuthServic interface {
 	EditProfileByID(ctx context.Context, userID int, req EditProfileRequest) (*InfoResponse, error)
 	ChangePassword(ctx context.Context, userID int, req ChangePasswordRequest) error
 	ResetPassword(ctx context.Context, req ResetPasswordRequest) error
+	GetProfile(ctx context.Context, userID int) (*InfoResponse, error)
+}
+
+type CreateRestaurantRequest struct {
+	Name        string    `json:"name" validate:"required"`
+	Description string    `json:"description"`
+	Address     string    `json:"address" validate:"required"`
+	Lat         float64   `json:"lat"`
+	Lng         float64   `json:"lng"`
+	ImageUrl    string    `json:"image_url"`
+	FoodType    string    `json:"food_type"`
+	OpenTime    time.Time `json:"open_time"`
+	CloseTime   time.Time `json:"close_time"`
+}
+
+type RestaurantResponse struct {
+	ID          int       `json:"id"`
+	OwnerID     int       `json:"owner_id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	Address     string    `json:"address"`
+	Lat         float64   `json:"lat"`
+	Lng         float64   `json:"lng"`
+	ImageUrl    string    `json:"image_url"`
+	FoodType    string    `json:"food_type"`
+	OpenTime    time.Time `json:"open_time"`
+	CloseTime   time.Time `json:"close_time"`
+	IsActive    bool      `json:"is_active"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+type EditRestaurantRequest struct {
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	Address     string    `json:"address"`
+	Lat         float64   `json:"lat"`
+	Lng         float64   `json:"lng"`
+	ImageUrl    string    `json:"image_url"`
+	FoodType    string    `json:"food_type"`
+	OpenTime    time.Time `json:"open_time"`
+	CloseTime   time.Time `json:"close_time"`
+	IsActive    bool      `json:"is_active"`
+}
+
+type RestaurantService interface {
+	AddRestaurant(ctx context.Context, ownerID int, req CreateRestaurantRequest) (*RestaurantResponse, error)
+	EditRestaurant(ctx context.Context, restaurantID int, ownerID int, req EditRestaurantRequest) (*RestaurantResponse, error)
+	GetRestaurantAll(ctx context.Context) ([]*RestaurantResponse, error)
 }

@@ -53,3 +53,24 @@ func AuthRequired(cfg *config.Config) fiber.Handler {
 		return c.Next()
 	}
 }
+
+// RoleRequired → ตรวจว่า role ตรงกับที่อนุญาตใช้หลัง AuthRequired
+// ตัวอย่าง: middleware.RoleRequired("rest", "admin")
+func RoleRequired(roles ...string) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		userRole, ok := c.Locals(LocalRole).(string)
+		if !ok || userRole == "" {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": "forbidden: no role found",
+			})
+		}
+		for _, role := range roles {
+			if userRole == role {
+				return c.Next()
+			}
+		}
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "forbidden: insufficient permissions",
+		})
+	}
+}

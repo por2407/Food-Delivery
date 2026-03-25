@@ -73,3 +73,14 @@ func (r *AuthRepository) EditProfileByID(ctx context.Context, user *domain.User)
 	}
 	return nil
 }
+
+func (r *AuthRepository) FindProfileByID(ctx context.Context, userID int) (*domain.User, error) {
+	var user domain.User
+	if err := r.db.WithContext(ctx).First(&user, userID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &user, nil
+}

@@ -173,3 +173,19 @@ func (h *AuthHandler) ResetPassword(c *fiber.Ctx) error {
 		"message": "password reset successfully",
 	})
 }
+
+func (h *AuthHandler) GetProfile(c *fiber.Ctx) error {
+	userID := c.Locals(middleware.LocalUserID).(int)
+	profile, err := h.service.GetProfile(c.Context(), userID)
+
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "profile retrieved successfully",
+		"data":    profile,
+	})
+}

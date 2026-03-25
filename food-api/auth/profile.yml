@@ -1,21 +1,14 @@
 info:
-  name: change-password
+  name: profile
   type: http
-  seq: 4
+  seq: 6
 
 http:
-  method: PATCH
-  url: http://localhost:3000/api/change-password
+  method: GET
+  url: http://localhost:3000/api/profile
   headers:
     - name: set-cookie
       value: access_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6InBvckBnbWFpbC5jb20iLCJleHAiOjE3NzQ0ODk2MzEsImlhdCI6MTc3NDQwMzIzMSwicm9sZSI6InVzZXIiLCJ1c2VyX2lkIjo0fQ.qvoH0XI_HENU5N9TJ-mI37GYROUpttjT3On1EFvR8Ts; expires=Wed, 01 Apr 2026 01:47:11 GMT; path=/; HttpOnly; SameSite=Lax
-  body:
-    type: json
-    data: |-
-      {
-        "old_password": "123456",
-        "new_password": "por123456789"
-      }
   auth: inherit
 
 settings:

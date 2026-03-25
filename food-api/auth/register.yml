@@ -10,10 +10,11 @@ http:
     type: json
     data: |-
       {
-        "name": "ประภาสิริ",
-        "email": "ing@gmail.com",
-        "password": "ing123456789",
-        "phone": "0985622222"
+        "name": "จอป กูด",
+        "email": "job@gmail.com",
+        "password": "job123456789",
+        "phone": "0894561112",
+        "role": "rest"
       }
   auth: inherit
 

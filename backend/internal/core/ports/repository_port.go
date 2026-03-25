@@ -11,4 +11,12 @@ type AuthRepository interface {
 	RegisterUser(ctx context.Context, user *domain.User) error
 	EditProfileByID(ctx context.Context, user *domain.User) error
 	UpdatePasswordByID(ctx context.Context, userID int, hashedPassword string) error
+	FindProfileByID(ctx context.Context, userID int) (*domain.User, error)
+}
+
+type RestaurantRepository interface {
+	CreateRestaurant(ctx context.Context, restaurant *domain.Restaurant) error
+	FindRestaurantByID(ctx context.Context, id int) (*domain.Restaurant, error)
+	EditRestaurant(ctx context.Context, restaurant *domain.Restaurant) error
+	FindAllRestaurants(ctx context.Context) ([]*domain.Restaurant, error)
 }
