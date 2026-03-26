@@ -87,3 +87,4 @@ func (r *RestaurantRepository) UpdateCloseOrOpenStatus(ctx context.Context, rest
 	}
 	return nil
 }
+

@@ -22,3 +22,7 @@ type RestaurantRepository interface {
 	FindAllRestaurants(ctx context.Context) ([]*domain.Restaurant, error)
 	UpdateCloseOrOpenStatus(ctx context.Context, restaurantID int, isActive bool) error
 }
+
+type MenuItemRepository interface {
+	CreateMenuItem(ctx context.Context, menuItem *domain.MenuItem) error
+}

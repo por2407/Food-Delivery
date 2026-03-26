@@ -34,6 +34,10 @@ func main() {
 	restaurantService := service.NewRestaurantService(restaurantRepo)
 	restaurantHandler := handlers.NewRestaurantHandler(restaurantService)
 
+	menuItemRepo := repositories.NewMenuItemRepository(db)
+	menuItemService := service.NewMenuItemService(menuItemRepo)
+	menuItemHandler := handlers.NewMenuHandler(menuItemService)
+
 	app := fiber.New()
 	api := app.Group("/api")
 	api.Get("/test", func(c *fiber.Ctx) error {
@@ -62,7 +66,10 @@ func main() {
 	restaurant.Post("/", restaurantHandler.CreateRestaurant)          //เพิ่มร้านอาหารใหม่ 1ร้าน ต่อ 1 user
 	restaurant.Put("/:id", restaurantHandler.EditRestaurant)          // แก้ไขข้อมูลร้านอาหาร (เฉพาะเจ้าของร้านหรือ admin เท่านั้น)
 	restaurant.Patch("/close/:id", restaurantHandler.CloseOrOpenRestaurant) // ปิดร้านอาหาร (เฉพาะเจ้าของร้านหรือ admin เท่านั้น)
-
+ 
+	// menu
+	menu := api.Group("/menu", middleware.AuthRequired(cfg), middleware.RoleRequired("rest", "admin"))
+	menu.Post("/", menuItemHandler.CreateMenuItem) // เพิ่มเมนูใหม่
 	fmt.Printf("server is running on port %s\n", cfg.App.Port)
 	if err := app.Listen(fmt.Sprintf(":%s", cfg.App.Port)); err != nil {
 		fmt.Println("Error starting server:", err)

@@ -109,3 +109,17 @@ type RestaurantService interface {
 	GetRestaurantAll(ctx context.Context) ([]*RestaurantResponse, error)
 	CloseOrOpenRestaurant(ctx context.Context, restaurantID int, isActive bool) error
 }
+
+type CreateMenuItemRequest struct {
+	Category     string  `json:"category"`
+	Name         string  `json:"name"`
+	Description  string  `json:"description"`
+	Price        float64 `json:"price"`
+	ImageURL     string  `json:"image_url"`
+	Stock        int     `json:"stock"`
+}
+
+
+type MenuItemService interface {
+	AddMenuItem(ctx context.Context, restaurantID int, req CreateMenuItemRequest) (*domain.MenuItem, error)
+}
