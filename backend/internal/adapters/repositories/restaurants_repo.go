@@ -76,3 +76,14 @@ func (r *RestaurantRepository) FindAllRestaurants(ctx context.Context) ([]*domai
 
 	return restaurants, nil
 }
+
+func (r *RestaurantRepository) UpdateCloseOrOpenStatus(ctx context.Context, restaurantID int, isActive bool) error {
+	result := r.db.WithContext(ctx).Model(&domain.Restaurant{}).Where("id = ?", restaurantID).Update("is_active", isActive)
+	if result.Error != nil{
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return errors.New("restaurant not found")
+	}
+	return nil
+}

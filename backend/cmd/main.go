@@ -61,7 +61,7 @@ func main() {
 	restaurant := api.Group("/restaurants", middleware.AuthRequired(cfg), middleware.RoleRequired("rest", "admin"))
 	restaurant.Post("/", restaurantHandler.CreateRestaurant)          //เพิ่มร้านอาหารใหม่ 1ร้าน ต่อ 1 user
 	restaurant.Put("/:id", restaurantHandler.EditRestaurant)          // แก้ไขข้อมูลร้านอาหาร (เฉพาะเจ้าของร้านหรือ admin เท่านั้น)
-	restaurant.Patch("/close/:id", restaurantHandler.CloseRestaurant) // ปิดร้านอาหาร (เฉพาะเจ้าของร้านหรือ admin เท่านั้น)
+	restaurant.Patch("/close/:id", restaurantHandler.CloseOrOpenRestaurant) // ปิดร้านอาหาร (เฉพาะเจ้าของร้านหรือ admin เท่านั้น)
 
 	fmt.Printf("server is running on port %s\n", cfg.App.Port)
 	if err := app.Listen(fmt.Sprintf(":%s", cfg.App.Port)); err != nil {

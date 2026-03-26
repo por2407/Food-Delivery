@@ -20,4 +20,5 @@ type RestaurantRepository interface {
 	FindRestaurantByOwnerID(ctx context.Context, ownerID int) (*domain.Restaurant, error)
 	EditRestaurant(ctx context.Context, restaurant *domain.Restaurant) error
 	FindAllRestaurants(ctx context.Context) ([]*domain.Restaurant, error)
+	UpdateCloseOrOpenStatus(ctx context.Context, restaurantID int, isActive bool) error
 }

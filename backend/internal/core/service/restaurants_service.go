@@ -115,3 +115,14 @@ func toRestaurantResponse(r *domain.Restaurant) *ports.RestaurantResponse {
 		CreatedAt:   r.CreatedAt,
 	}
 }
+
+func (s *RestaurantService) CloseOrOpenRestaurant(ctx context.Context, restaurantID int, isActive bool) error {
+	existing, err := s.restaurantRepo.FindRestaurantByID(ctx, restaurantID)
+	if err != nil {
+		return err
+	}
+	if existing == nil {
+		return errors.New("restaurant not found")
+	}
+	return s.restaurantRepo.UpdateCloseOrOpenStatus(ctx, restaurantID, isActive)
+}

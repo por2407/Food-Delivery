@@ -85,17 +85,35 @@ func (h *RestaurantHandler) GetRestaurantAll(c *fiber.Ctx) error {
 	})
 }
 
-func (h *RestaurantHandler) CloseRestaurant(c *fiber.Ctx) error {
+func (h *RestaurantHandler) CloseOrOpenRestaurant(c *fiber.Ctx) error {
+	var req struct {
+	IsActive bool `json:"is_active"`
+	}
 	// ดึง restaurant ID จาก URL param :id
 	restaurantID, err := c.ParamsInt("id")
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request payload",
+		})
+	}
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid restaurant ID",
 		})
 
 	}
-	return c.JSON(fiber.Map{
-		"message": "Close restaurant successfully",
-		"data":    restaurantID,
+
+	if err := h.restaurantService.CloseOrOpenRestaurant(c.Context(), restaurantID, req.IsActive); err != nil {
+		if err.Error() == "restaurant not found" {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	txtStatus := "closed"
+	if req.IsActive {
+		txtStatus = "opened"
+	}
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Restaurant " + txtStatus + " successfully",
 	})
 }

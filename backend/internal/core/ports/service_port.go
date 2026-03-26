@@ -107,4 +107,5 @@ type RestaurantService interface {
 	AddRestaurant(ctx context.Context, ownerID int, req CreateRestaurantRequest) (*RestaurantResponse, error)
 	EditRestaurant(ctx context.Context, restaurantID int, ownerID int, req EditRestaurantRequest) (*RestaurantResponse, error)
 	GetRestaurantAll(ctx context.Context) ([]*RestaurantResponse, error)
+	CloseOrOpenRestaurant(ctx context.Context, restaurantID int, isActive bool) error
 }
