@@ -1,0 +1,29 @@
+info:
+  name: add
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: http://localhost:3000/api/menu/1
+  headers:
+    - name: set-cookie
+      value: access_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImpvYkBnbWFpbC5jb20iLCJleHAiOjE3NzQ2NzA5MDgsImlhdCI6MTc3NDU4NDUwOCwicm9sZSI6InJlc3QiLCJ1c2VyX2lkIjo2fQ.9TA8DJ-CD34BHodKmtrqsQ7musu_XMGn1_GDcdjyR3o; expires=Fri, 03 Apr 2026 04:08:28 GMT; path=/; HttpOnly; SameSite=Lax
+  body:
+    type: json
+    data: |-
+      {
+          "category": "อาหารจานหลัก",
+          "name": "ต้มยำกุ้งน้ำข้น",
+          "description": "ต้มยำกุ้งแม่น้ำ น้ำข้นเข้มข้น รสจัดจ้านถึงใจ",
+          "price": 150.00,
+          "image_url": "https://example.com/tomyum.jpg",
+          "stock": 25
+        }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

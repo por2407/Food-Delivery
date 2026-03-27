@@ -10,11 +10,11 @@ import (
 )
 
 type AuthHandler struct {
-	service ports.AuthServic
+	service ports.AuthServicePort
 	cfg     *config.Config
 }
 
-func NewAuthHandler(service ports.AuthServic, cfg *config.Config) *AuthHandler {
+func NewAuthHandler(service ports.AuthServicePort, cfg *config.Config) *AuthHandler {
 	return &AuthHandler{
 		service: service,
 		cfg:     cfg,

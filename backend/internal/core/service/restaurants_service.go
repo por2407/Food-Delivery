@@ -8,10 +8,10 @@ import (
 )
 
 type RestaurantService struct {
-	restaurantRepo ports.RestaurantRepository
+	restaurantRepo ports.RestaurantRepositoryPort
 }
 
-func NewRestaurantService(restaurantRepo ports.RestaurantRepository) *RestaurantService {
+func NewRestaurantService(restaurantRepo ports.RestaurantRepositoryPort) *RestaurantService {
 	return &RestaurantService{restaurantRepo: restaurantRepo}
 }
 

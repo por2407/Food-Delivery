@@ -1,0 +1,24 @@
+info:
+  name: close menu
+  type: http
+  seq: 4
+
+http:
+  method: PATCH
+  url: http://localhost:3000/api/menu/close/1/3
+  headers:
+    - name: set-cookie
+      value: access_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImpvYkBnbWFpbC5jb20iLCJleHAiOjE3NzQ2NzA5MDgsImlhdCI6MTc3NDU4NDUwOCwicm9sZSI6InJlc3QiLCJ1c2VyX2lkIjo2fQ.9TA8DJ-CD34BHodKmtrqsQ7musu_XMGn1_GDcdjyR3o; expires=Fri, 03 Apr 2026 04:08:28 GMT; path=/; HttpOnly; SameSite=Lax
+  body:
+    type: json
+    data: |-
+      {
+          "is_active": false
+        }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

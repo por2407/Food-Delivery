@@ -65,5 +65,9 @@ func NewPostgresDB(cfg *config.Config) (*gorm.DB, error) {
 }
 
 func MigratePostgresDB(db *gorm.DB) error {
-	return db.AutoMigrate(&domain.User{}, &domain.Restaurant{}, &domain.MenuItem{})
+	// DropTableIfExists ก่อน แล้วค่อย AutoMigrate ใหม่ (ใช้เฉพาะ dev เท่านั้น!)
+	// if err := db.Migrator().DropTable(&domain.Restaurant{}, &domain.MenuItem{}); err != nil {
+	// 	log.Printf("Warning: failed to drop tables: %v", err)
+	// }
+	return db.AutoMigrate(&domain.User{}, &domain.Restaurant{}, &domain.MenuItem{}, &domain.Order{}, &domain.OderItem{}, &domain.Review{})
 }

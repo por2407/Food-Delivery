@@ -54,6 +54,33 @@ func AuthRequired(cfg *config.Config) fiber.Handler {
 	}
 }
 
+// OptionalAuth → ถ้ามี token ก็ parse แล้วเก็บ locals, ถ้าไม่มีก็ผ่านได้เลย (ไม่ block)
+func OptionalAuth(cfg *config.Config) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		tokenStr := c.Cookies("access_token")
+		if tokenStr == "" {
+			return c.Next()
+		}
+		token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
+			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fiber.ErrUnauthorized
+			}
+			return []byte(cfg.JWT.Secret), nil
+		})
+		if err != nil || !token.Valid {
+			// token ไม่ valid ก็ผ่านได้เลย (ถือว่าไม่ได้ login)
+			return c.Next()
+		}
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if ok {
+			c.Locals(LocalUserID, int(claims["user_id"].(float64)))
+			c.Locals(LocalEmail, claims["email"].(string))
+			c.Locals(LocalRole, claims["role"].(string))
+		}
+		return c.Next()
+	}
+}
+
 // RoleRequired → ตรวจว่า role ตรงกับที่อนุญาตใช้หลัง AuthRequired
 // ตัวอย่าง: middleware.RoleRequired("rest", "admin")
 func RoleRequired(roles ...string) fiber.Handler {

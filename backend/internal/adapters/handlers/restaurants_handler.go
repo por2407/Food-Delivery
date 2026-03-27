@@ -8,10 +8,10 @@ import (
 )
 
 type RestaurantHandler struct {
-	restaurantService ports.RestaurantService
+	restaurantService ports.RestaurantServicePort
 }
 
-func NewRestaurantHandler(restaurantService ports.RestaurantService) *RestaurantHandler {
+func NewRestaurantHandler(restaurantService ports.RestaurantServicePort) *RestaurantHandler {
 	return &RestaurantHandler{restaurantService: restaurantService}
 }
 
@@ -87,7 +87,7 @@ func (h *RestaurantHandler) GetRestaurantAll(c *fiber.Ctx) error {
 
 func (h *RestaurantHandler) CloseOrOpenRestaurant(c *fiber.Ctx) error {
 	var req struct {
-	IsActive bool `json:"is_active"`
+		IsActive bool `json:"is_active"`
 	}
 	// ดึง restaurant ID จาก URL param :id
 	restaurantID, err := c.ParamsInt("id")

@@ -14,11 +14,11 @@ import (
 )
 
 type AuthService struct {
-	repo ports.AuthRepository
+	repo ports.AuthRepositoryPort
 	cfg  *config.Config
 }
 
-func NewAuthService(repo ports.AuthRepository, cfg *config.Config) *AuthService {
+func NewAuthService(repo ports.AuthRepositoryPort, cfg *config.Config) *AuthService {
 	return &AuthService{repo: repo, cfg: cfg}
 }
 

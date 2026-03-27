@@ -2,6 +2,7 @@ package ports
 
 import (
 	"context"
+	"food_delivery/internal/core/domain"
 	"time"
 )
 
@@ -53,7 +54,7 @@ type ResetPasswordRequest struct {
 	NewPassword string `json:"new_password" validate:"required,min=6"`
 }
 
-type AuthServic interface {
+type AuthServicePort interface {
 	Register(ctx context.Context, req RegisterRequest) (*RegisterRequest, error)
 	Login(ctx context.Context, req LoginRequest) (*LoginResponse, error)
 	EditProfileByID(ctx context.Context, userID int, req EditProfileRequest) (*InfoResponse, error)
@@ -103,7 +104,7 @@ type EditRestaurantRequest struct {
 	IsActive    bool      `json:"is_active"`
 }
 
-type RestaurantService interface {
+type RestaurantServicePort interface {
 	AddRestaurant(ctx context.Context, ownerID int, req CreateRestaurantRequest) (*RestaurantResponse, error)
 	EditRestaurant(ctx context.Context, restaurantID int, ownerID int, req EditRestaurantRequest) (*RestaurantResponse, error)
 	GetRestaurantAll(ctx context.Context) ([]*RestaurantResponse, error)
@@ -111,15 +112,18 @@ type RestaurantService interface {
 }
 
 type CreateMenuItemRequest struct {
-	Category     string  `json:"category"`
-	Name         string  `json:"name"`
-	Description  string  `json:"description"`
-	Price        float64 `json:"price"`
-	ImageURL     string  `json:"image_url"`
-	Stock        int     `json:"stock"`
+	Category    string  `json:"category"`
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	Price       float64 `json:"price"`
+	ImageURL    string  `json:"image_url"`
+	Stock       int     `json:"stock"`
 }
 
-
-type MenuItemService interface {
-	AddMenuItem(ctx context.Context, restaurantID int, req CreateMenuItemRequest) (*domain.MenuItem, error)
+type MenuItemServicePort interface {
+	CreateMenuItem(ctx context.Context, ownerID int, restaurantID int, req CreateMenuItemRequest) (*domain.MenuItem, error)
+	EditMenuItem(ctx context.Context, ownerID int, menuItemID int, restaurantID int, req CreateMenuItemRequest) (*domain.MenuItem, error)
+	CloseOrOpenMenuItem(ctx context.Context, ownerID int, menuItemID int, restaurantID int, isActive bool) error
+	// requesterID = 0 หมายถึงไม่ได้ login, ถ้าเป็นเจ้าของร้านจะเห็นเมนูที่ปิดด้วย
+	GetMenuItemAllByID(ctx context.Context, restaurantID int, requesterID int) ([]*domain.MenuItem, error)
 }
