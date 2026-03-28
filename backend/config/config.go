@@ -12,8 +12,16 @@ import (
 type Config struct {
 	App          AppConfig
 	Database     DatabaseConfig
+	Redis        RedisConfig
 	JWT          JWTConfig
 	RefreshToken RefreshTokenConfig
+	Google       GoogleConfig
+}
+
+type GoogleConfig struct {
+	ClientID     string
+	ClientSecret string
+	RedirectURL  string
 }
 
 // AppConfig holds application-level configuration
@@ -40,6 +48,13 @@ type DatabaseConfig struct {
 type JWTConfig struct {
 	Secret      string
 	ExpireHours int
+}
+
+// RedisConfig holds Redis connection configuration
+type RedisConfig struct {
+	Addr     string
+	Password string
+	DB       int
 }
 
 type RefreshTokenConfig struct {
@@ -83,6 +98,15 @@ func Load() (*Config, error) {
 		poolMaxIdleTime = 10
 	}
 
+	redisDB, err := strconv.Atoi(os.Getenv("REDIS_DB"))
+	if err != nil {
+		redisDB = 0
+	}
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		redisAddr = "localhost:6379"
+	}
+
 	cfg := &Config{
 		App: AppConfig{
 			Env:  os.Getenv("APP_ENV"),
@@ -107,6 +131,20 @@ func Load() (*Config, error) {
 			Secret:        os.Getenv("JWT_REFRESH_SECRET"),
 			ExpireMinutes: refreshExpireMinutes,
 		},
+		Redis: RedisConfig{
+			Addr:     redisAddr,
+			Password: os.Getenv("REDIS_PASSWORD"),
+			DB:       redisDB,
+		},
+		Google: GoogleConfig{
+			ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
+			ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
+			RedirectURL:  os.Getenv("GOOGLE_REDIRECT_URL"),
+		},
+	}
+
+	if cfg.Google.RedirectURL == "" {
+		cfg.Google.RedirectURL = "http://localhost:3000/api/auth/google/callback"
 	}
 
 	cfg.Database.DSN = fmt.Sprintf(

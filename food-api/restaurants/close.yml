@@ -9,6 +9,12 @@ http:
   headers:
     - name: set-cookie
       value: access_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImpvYkBnbWFpbC5jb20iLCJleHAiOjE3NzQ0OTg3NDQsImlhdCI6MTc3NDQxMjM0NCwicm9sZSI6InJlc3QiLCJ1c2VyX2lkIjo2fQ.bz7P3XEZLJ8LSMibmNbmlIVSqIFqo9FL6EV2XdQ55e8; expires=Wed, 01 Apr 2026 04:19:04 GMT; path=/; HttpOnly; SameSite=Lax
+  body:
+    type: json
+    data: |-
+      {
+        "is_active" : true
+      }
   auth: inherit
 
 settings:

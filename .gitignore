@@ -1,1 +1,4 @@
 backend/.env
+frontend/node_modules
+api_structure.md
+ref.html

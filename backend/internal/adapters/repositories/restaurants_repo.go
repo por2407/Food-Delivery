@@ -68,13 +68,27 @@ func (r *RestaurantRepository) EditRestaurant(ctx context.Context, restaurant *d
 	return nil
 }
 
-func (r *RestaurantRepository) FindAllRestaurants(ctx context.Context) ([]*domain.Restaurant, error) {
+func (r *RestaurantRepository) FindAllRestaurants(ctx context.Context, page int, limit int, foodType string) ([]*domain.Restaurant, int64, error) {
 	var restaurants []*domain.Restaurant
-	if err := r.db.WithContext(ctx).Where("status = ?", "Y").Find(&restaurants).Error; err != nil {
-		return nil, err
+	var total int64
+	query := r.db.WithContext(ctx).Model(&domain.Restaurant{}).Where("status = ?", "Y")
+
+	if foodType != "" {
+		query = query.Where("food_type = ?", foodType)
 	}
 
-	return restaurants, nil
+	// Count total records before pagination
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Apply pagination
+	offset := (page - 1) * limit
+	if err := query.Offset(offset).Limit(limit).Find(&restaurants).Error; err != nil {
+		return nil, 0, err
+	}
+
+	return restaurants, total, nil
 }
 
 func (r *RestaurantRepository) UpdateCloseOrOpenStatus(ctx context.Context, restaurantID int, isActive bool) error {

@@ -11,6 +11,10 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
+	oauth2v2 "google.golang.org/api/oauth2/v2"
+	"google.golang.org/api/option"
 )
 
 type AuthService struct {
@@ -188,5 +192,86 @@ func (s *AuthService) GetProfile(ctx context.Context, userID int) (*ports.InfoRe
 		Role:   user.Role,
 		Phone:  user.Phone,
 		Avatar: user.Avatar,
+	}, nil
+}
+
+// ─── Google OAuth ────────────────────────────────────────────────────
+
+func (s *AuthService) oauthConfig() *oauth2.Config {
+	return &oauth2.Config{
+		ClientID:     s.cfg.Google.ClientID,
+		ClientSecret: s.cfg.Google.ClientSecret,
+		RedirectURL:  s.cfg.Google.RedirectURL,
+		Endpoint:     google.Endpoint,
+		Scopes: []string{
+			"https://www.googleapis.com/auth/userinfo.email",
+			"https://www.googleapis.com/auth/userinfo.profile",
+		},
+	}
+}
+
+func (s *AuthService) GoogleLogin(ctx context.Context) (string, error) {
+	// สร้าง state (ในโปรเจคจริงควรเก็บใน session หรือ cookie เพื่อป้องกัน CSRF)
+	url := s.oauthConfig().AuthCodeURL("state-token", oauth2.AccessTypeOffline)
+	return url, nil
+}
+
+func (s *AuthService) GoogleCallback(ctx context.Context, code string) (*ports.LoginResponse, error) {
+	config := s.oauthConfig()
+
+	// 1. แลกเปลี่ยน code เป็น token
+	tok, err := config.Exchange(ctx, code)
+	if err != nil {
+		return nil, fmt.Errorf("failed to exchange token: %w", err)
+	}
+
+	// 2. ดึงข้อมูล User จาก Google API
+	oauth2Service, err := oauth2v2.NewService(ctx, option.WithTokenSource(config.TokenSource(ctx, tok)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create oauth2 service: %w", err)
+	}
+
+	userinfo, err := oauth2Service.Userinfo.Get().Do()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user info: %w", err)
+	}
+
+	// 3. ตรวจสอบว่า User มีอยู่แล้วหรือไม่
+	user, err := s.repo.FindUserByEmail(ctx, userinfo.Email)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find user: %w", err)
+	}
+
+	// 4. ถ้าไม่มีให้ Create ใหม่ (Social Login ไม่มี password)
+	if user == nil {
+		user = &domain.User{
+			Email:  userinfo.Email,
+			Name:   userinfo.Name,
+			Avatar: userinfo.Picture,
+			Role:   "user", // Default role for social login
+		}
+		if err := s.repo.RegisterUser(ctx, user); err != nil {
+			return nil, fmt.Errorf("failed to auto-register user: %w", err)
+		}
+		// ดึงมาใหม่เพื่อให้ได้ ID
+		user, _ = s.repo.FindUserByEmail(ctx, userinfo.Email)
+	}
+
+	// 5. ออก Access Token (JWT)
+	accessToken, err := s.generateToken(user, s.cfg.JWT.Secret,
+		time.Duration(s.cfg.JWT.ExpireHours)*time.Hour)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate access token: %w", err)
+	}
+
+	return &ports.LoginResponse{
+		AccessToken: accessToken,
+		Info: ports.InfoResponse{
+			Name:   user.Name,
+			Email:  user.Email,
+			Role:   user.Role,
+			Phone:  user.Phone,
+			Avatar: user.Avatar,
+		},
 	}, nil
 }

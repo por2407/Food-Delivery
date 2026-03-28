@@ -84,17 +84,28 @@ func (s *RestaurantService) EditRestaurant(ctx context.Context, restaurantID int
 	return toRestaurantResponse(updated), nil
 }
 
-func (s *RestaurantService) GetRestaurantAll(ctx context.Context) ([]*ports.RestaurantResponse, error) {
-	restaurants, err := s.restaurantRepo.FindAllRestaurants(ctx)
+func (s *RestaurantService) GetRestaurantAll(ctx context.Context, page int, limit int, foodType string) ([]*ports.RestaurantResponse, int64, error) {
+	restaurants, total, err := s.restaurantRepo.FindAllRestaurants(ctx, page, limit, foodType)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	response := make([]*ports.RestaurantResponse, len(restaurants))
+	for i, r := range restaurants {
+		response[i] = toRestaurantResponse(r)
+	}
+	return response, total, nil
+}
+
+func (s *RestaurantService) GetRestaurantByID(ctx context.Context, restaurantID int) (*ports.RestaurantResponse, error) {
+	restaurant, err := s.restaurantRepo.FindRestaurantByID(ctx, restaurantID)
 	if err != nil {
 		return nil, err
 	}
-
-	respone := make([]*ports.RestaurantResponse, len(restaurants))
-	for i, r := range restaurants {
-		respone[i] = toRestaurantResponse(r)
+	if restaurant == nil {
+		return nil, errors.New("restaurant not found")
 	}
-	return respone, nil
+	return toRestaurantResponse(restaurant), nil
 }
 
 // helper map domain → response

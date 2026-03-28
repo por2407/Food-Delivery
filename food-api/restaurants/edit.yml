@@ -18,8 +18,8 @@ http:
         "address": "5/5 ถนนสีลม แขวงสีลม เขตบางรัก กรุงเทพฯ",
         "lat": 13.7270,
         "lng": 100.5310,
-        "image_url": "https://example.com/somtumder.jpg",
-        "food_type": "Isaan",
+        "image_url": "https://lh3.googleusercontent.com/aida-public/AB6AXuA5EeHIWab-rXU_smvP6jLquHsX3-Io07wbD0WEgoumk4t0zkcDbg-boDIwZGYgxZmB1yRv3pMOvFda1EVTnmekX0ZTe96O4yG0B_Af1b8w4XsmmjsUkHXBnmSC0zQLHqLXEAMxIzSuXL9GlGz4ev1oZtDSNRqh1-JctzUXoOTU2TJuMEW4QJXm06UXXojruLrLlZQ9dYgoKODsCidQw-B2gn4nL1XunERBht-U5D7vLfL07YcvpU4gDozKDFrdKabmuC4evj4WbZw",
+        "food_type": "Thai",
         "open_time": "2024-01-01T11:00:00Z",
         "close_time": "2024-01-01T21:30:00Z",
         "is_active": false

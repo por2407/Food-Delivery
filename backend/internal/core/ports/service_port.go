@@ -61,6 +61,9 @@ type AuthServicePort interface {
 	ChangePassword(ctx context.Context, userID int, req ChangePasswordRequest) error
 	ResetPassword(ctx context.Context, req ResetPasswordRequest) error
 	GetProfile(ctx context.Context, userID int) (*InfoResponse, error)
+	// Google OAuth
+	GoogleLogin(ctx context.Context) (string, error)
+	GoogleCallback(ctx context.Context, code string) (*LoginResponse, error)
 }
 
 type CreateRestaurantRequest struct {
@@ -107,7 +110,8 @@ type EditRestaurantRequest struct {
 type RestaurantServicePort interface {
 	AddRestaurant(ctx context.Context, ownerID int, req CreateRestaurantRequest) (*RestaurantResponse, error)
 	EditRestaurant(ctx context.Context, restaurantID int, ownerID int, req EditRestaurantRequest) (*RestaurantResponse, error)
-	GetRestaurantAll(ctx context.Context) ([]*RestaurantResponse, error)
+	GetRestaurantAll(ctx context.Context, page int, limit int, foodType string) ([]*RestaurantResponse, int64, error)
+	GetRestaurantByID(ctx context.Context, restaurantID int) (*RestaurantResponse, error)
 	CloseOrOpenRestaurant(ctx context.Context, restaurantID int, isActive bool) error
 }
 
@@ -126,4 +130,74 @@ type MenuItemServicePort interface {
 	CloseOrOpenMenuItem(ctx context.Context, ownerID int, menuItemID int, restaurantID int, isActive bool) error
 	// requesterID = 0 หมายถึงไม่ได้ login, ถ้าเป็นเจ้าของร้านจะเห็นเมนูที่ปิดด้วย
 	GetMenuItemAllByID(ctx context.Context, restaurantID int, requesterID int) ([]*domain.MenuItem, error)
+}
+
+// ─── Address ──────────────────────────────────────────────────────────
+type CreateAddressRequest struct {
+	Label   string  `json:"label" validate:"required"`
+	Address string  `json:"address" validate:"required"`
+	Lat     float64 `json:"lat"`
+	Lng     float64 `json:"lng"`
+	Note    string  `json:"note"`
+}
+
+type AddressServicePort interface {
+	AddAddress(ctx context.Context, userID int, req CreateAddressRequest) (*domain.Address, error)
+	GetAddresses(ctx context.Context, userID int) ([]*domain.Address, error)
+	UpdateAddress(ctx context.Context, userID int, addressID int, req CreateAddressRequest) (*domain.Address, error)
+	DeleteAddress(ctx context.Context, userID int, addressID int) error
+	SetDefault(ctx context.Context, userID int, addressID int) error
+}
+
+// ─── Order ──────────────────────────────────────────────────────────
+type OrderItemRequest struct {
+	MenuItemID int `json:"menu_item_id" validate:"required"`
+	Quantity   int `json:"quantity" validate:"required,min=1"`
+}
+
+type CreateOrderRequest struct {
+	RestaurantID int                `json:"restaurant_id" validate:"required"`
+	AddressID    int                `json:"address_id" validate:"required"`
+	Items        []OrderItemRequest `json:"items" validate:"required,min=1"`
+	Note         string             `json:"note"`
+}
+
+type OrderServicePort interface {
+	CreateOrder(ctx context.Context, customerID int, req CreateOrderRequest) (*domain.Order, error)
+	GetOrderByID(ctx context.Context, orderID int) (*domain.Order, error)
+	GetOrderByIDWithAuth(ctx context.Context, orderID int, userID int, role string) (*domain.Order, error)
+	GetOrdersByCustomerID(ctx context.Context, customerID int) ([]*domain.Order, error)
+	GetOrdersByRestaurantOwnerID(ctx context.Context, ownerID int) ([]*domain.Order, error)
+	// Restaurant actions
+	AcceptOrder(ctx context.Context, ownerID int, orderID int) error
+	RejectOrder(ctx context.Context, ownerID int, orderID int) error
+	PrepareOrder(ctx context.Context, ownerID int, orderID int) error
+	ReadyOrder(ctx context.Context, ownerID int, orderID int) error
+	// Rider actions
+	GetReadyOrders(ctx context.Context) ([]*domain.Order, error)
+	GetOrdersByRiderID(ctx context.Context, riderID int) ([]*domain.Order, error)
+	PickUpOrder(ctx context.Context, riderID int, orderID int) error
+	DeliverOrder(ctx context.Context, riderID int, orderID int) error
+	// Cancel
+	CancelOrder(ctx context.Context, userID int, orderID int) error
+}
+
+// ─── Review ───────────────────────────────────────────────────────────
+
+type CreateReviewRequest struct {
+	OrderID int    `json:"order_id" validate:"required"`
+	Rating  int    `json:"rating" validate:"required,min=1,max=5"`
+	Comment string `json:"comment"`
+}
+
+type UpdateReviewRequest struct {
+	Rating  int    `json:"rating" validate:"required,min=1,max=5"`
+	Comment string `json:"comment"`
+}
+
+type ReviewServicePort interface {
+	CreateReview(ctx context.Context, customerID int, req CreateReviewRequest) (*domain.Review, error)
+	GetReviewsByRestaurantID(ctx context.Context, restaurantID int) ([]*domain.Review, error)
+	UpdateReview(ctx context.Context, customerID int, reviewID int, req UpdateReviewRequest) (*domain.Review, error)
+	DeleteReview(ctx context.Context, customerID int, reviewID int) error
 }

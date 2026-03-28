@@ -69,5 +69,13 @@ func MigratePostgresDB(db *gorm.DB) error {
 	// if err := db.Migrator().DropTable(&domain.Restaurant{}, &domain.MenuItem{}); err != nil {
 	// 	log.Printf("Warning: failed to drop tables: %v", err)
 	// }
-	return db.AutoMigrate(&domain.User{}, &domain.Restaurant{}, &domain.MenuItem{}, &domain.Order{}, &domain.OderItem{}, &domain.Review{})
+	return db.AutoMigrate(
+		&domain.User{},
+		&domain.Address{},
+		&domain.Restaurant{},
+		&domain.MenuItem{},
+		&domain.Order{},
+		&domain.OrderItem{},
+		&domain.Review{},
+	)
 }

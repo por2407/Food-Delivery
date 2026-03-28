@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"food_delivery/config"
 	"food_delivery/pkg/database"
+	pkgredis "food_delivery/pkg/redis"
+	"food_delivery/pkg/ws"
 
 	"food_delivery/internal/adapters/handlers"
 	"food_delivery/internal/adapters/middleware"
@@ -11,6 +14,7 @@ import (
 	"food_delivery/internal/core/service"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 )
 
 func main() {
@@ -26,62 +30,133 @@ func main() {
 		return
 	}
 
+	// ─── Redis ────────────────────────────────────────────────────────
+	rdb, err := pkgredis.NewRedisClient(cfg)
+	if err != nil {
+		fmt.Printf("Error connecting to Redis: %v\n", err)
+		return
+	}
+
+	// ─── WebSocket Hub ────────────────────────────────────────────────
+	hub := ws.NewHub(rdb)
+	// Subscribe Redis patterns สำหรับ multi-instance
+	ctx := context.Background()
+	hub.SubscribePattern(ctx, ws.ChannelRestaurant+"*")
+	hub.Subscribe(ctx, ws.ChannelRiders)
+	hub.SubscribePattern(ctx, ws.ChannelCustomer+"*")
+
+	// ─── Repositories ─────────────────────────────────────────────────
 	authRepo := repositories.NewAuthRepository(db)
-	authService := service.NewAuthService(authRepo, cfg)
-	authHandler := handlers.NewAuthHandler(authService, cfg)
-
 	restaurantRepo := repositories.NewRestaurantRepository(db)
-	restaurantService := service.NewRestaurantService(restaurantRepo)
-	restaurantHandler := handlers.NewRestaurantHandler(restaurantService)
-
 	menuItemRepo := repositories.NewMenuItemRepository(db)
-	menuItemService := service.NewMenuItemService(menuItemRepo, restaurantRepo)
-	menuItemHandler := handlers.NewMenuHandler(menuItemService)
+	addressRepo := repositories.NewAddressRepository(db)
+	orderRepo := repositories.NewOrderRepository(db)
+	reviewRepo := repositories.NewReviewRepository(db)
 
-	orderHandler := handlers.NewOrdersHandler()
+	// ─── Services ─────────────────────────────────────────────────────
+	authService := service.NewAuthService(authRepo, cfg)
+	restaurantService := service.NewRestaurantService(restaurantRepo)
+	menuItemService := service.NewMenuItemService(menuItemRepo, restaurantRepo)
+	addressService := service.NewAddressService(addressRepo)
+	orderService := service.NewOrderService(orderRepo, menuItemRepo, restaurantRepo, addressRepo)
+	reviewService := service.NewReviewService(reviewRepo, orderRepo, restaurantRepo)
+
+	// ─── Handlers ─────────────────────────────────────────────────────
+	authHandler := handlers.NewAuthHandler(authService, cfg)
+	restaurantHandler := handlers.NewRestaurantHandler(restaurantService)
+	menuItemHandler := handlers.NewMenuHandler(menuItemService)
+	addressHandler := handlers.NewAddressHandler(addressService)
+	orderHandler := handlers.NewOrdersHandler(orderService, hub)
+	reviewHandler := handlers.NewReviewHandler(reviewService)
+	wsHandler := handlers.NewWSHandler(hub)
 
 	app := fiber.New()
+
+	// ─── CORS ─────────────────────────────────────────────────────────
+	app.Use(cors.New(cors.Config{
+		AllowOrigins:     "http://localhost:3000, http://localhost:5173",
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
+		AllowMethods:     "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+		AllowCredentials: true,
+	}))
 	api := app.Group("/api")
 	api.Get("/test", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{
-			"message": "Hello, World!",
-		})
+		return c.JSON(fiber.Map{"message": "Hello, World!"})
 	})
 
-	// Public routes (ไม่ต้อง login)
+	// ─── Public routes ────────────────────────────────────────────────
 	api.Post("/register", authHandler.Register)
 	api.Post("/login", authHandler.Login)
 	api.Post("/logout", authHandler.Logout)
-	api.Post("/reset-password", authHandler.ResetPassword) // ลืมรหัสผ่าน
+	api.Post("/reset-password", authHandler.ResetPassword)
+	// Google OAuth
+	api.Get("/auth/google/login", authHandler.GoogleLogin)
+	api.Get("/auth/google/callback", authHandler.GoogleCallback)
 
-	api.Get("/restaurants", restaurantHandler.GetRestaurantAll) // ดูข้อมูลร้านอาหาร (เปิดสาธารณะ ไม่ต้อง login)
-	// menu - Public GET แต่ถ้า login แล้วเป็นเจ้าของร้านจะเห็นเมนูที่ปิดด้วย
+	api.Get("/restaurants", restaurantHandler.GetRestaurantAll)
+	api.Get("/restaurants/:id", restaurantHandler.GetRestaurantByID)
+	api.Get("/food-types", restaurantHandler.GetFoodTypes)
 	api.Get("/menu/:restaurant_id", middleware.OptionalAuth(cfg), menuItemHandler.GetMenuItemAllByID)
+	api.Get("/reviews/restaurant/:restaurant_id", reviewHandler.GetReviewsByRestaurant)
 
-	// Protected routes (ต้อง login → มี access_token cookie)
+	// ─── Protected routes (ต้อง login) ─────────────────────────────────
 	auth := api.Group("/", middleware.AuthRequired(cfg))
 	auth.Get("/me", authHandler.Me)
 	auth.Put("/edit-profile", authHandler.EditProfile)
 	auth.Patch("/change-password", authHandler.ChangePassword)
 	auth.Get("/profile", authHandler.GetProfile)
 
-	// Restaurant routes (ต้อง login + role = "rest" หรือ "admin")
+	// ─── Address routes (ต้อง login) ──────────────────────────────────
+	address := api.Group("/addresses", middleware.AuthRequired(cfg))
+	address.Post("/", addressHandler.AddAddress)
+	address.Get("/", addressHandler.GetAddresses)
+	address.Put("/:id", addressHandler.UpdateAddress)
+	address.Delete("/:id", addressHandler.DeleteAddress)
+	address.Patch("/:id/default", addressHandler.SetDefault)
+
+	// ─── Restaurant management (role: rest) ───────────────────────────
 	restaurant := api.Group("/restaurants", middleware.AuthRequired(cfg), middleware.RoleRequired("rest"))
-	restaurant.Post("/", restaurantHandler.CreateRestaurant)                //เพิ่มร้านอาหารใหม่ 1ร้าน ต่อ 1 user
-	restaurant.Put("/:id", restaurantHandler.EditRestaurant)                // แก้ไขข้อมูลร้านอาหาร เฉพาะเจ้าของร้าน
-	restaurant.Patch("/close/:id", restaurantHandler.CloseOrOpenRestaurant) // ปิดร้านอาหาร เฉพาะเจ้าของร้าน
+	restaurant.Post("/", restaurantHandler.CreateRestaurant)
+	restaurant.Put("/:id", restaurantHandler.EditRestaurant)
+	restaurant.Patch("/close/:id", restaurantHandler.CloseOrOpenRestaurant)
 
-	// menu management - rest เท่านั้น + ต้องเป็นเจ้าของร้าน (admin ดูได้ แต่แก้ไขไม่ได้)
+	// ─── Menu management (role: rest) ─────────────────────────────────
 	menu := api.Group("/menu", middleware.AuthRequired(cfg), middleware.RoleRequired("rest"))
-	menu.Post("/:restaurant_id", menuItemHandler.CreateMenuItem)                           // เพิ่มเมนูใหม่
-	menu.Put("/:restaurant_id/:menu_item_id", menuItemHandler.EditMenuItem)                // แก้ไขเมนู เฉพาะเจ้าของร้านเท่านั้น
-	menu.Patch("/close/:restaurant_id/:menu_item_id", menuItemHandler.CloseOrOpenMenuItem) // เปิด/ปิดเมนู เฉพาะเจ้าของร้านเท่านั้น
+	menu.Post("/:restaurant_id", menuItemHandler.CreateMenuItem)
+	menu.Put("/:restaurant_id/:menu_item_id", menuItemHandler.EditMenuItem)
+	menu.Patch("/close/:restaurant_id/:menu_item_id", menuItemHandler.CloseOrOpenMenuItem)
 
+	// ─── Review routes ────────────────────────────────────────────────
+	review := api.Group("/reviews", middleware.AuthRequired(cfg), middleware.RoleRequired("user"))
+	review.Post("/", reviewHandler.CreateReview)
+	review.Put("/:id", reviewHandler.UpdateReview)
+	review.Delete("/:id", reviewHandler.DeleteReview)
+
+	// ─── Order routes ─────────────────────────────────────────────────
 	order := api.Group("/orders", middleware.AuthRequired(cfg))
-	order.Post("/", orderHandler.CreateOrder) // สร้างออเดอร์ใหม่ (ลูกค้า)
-	// order.Get("/customer", orderHandler.GetOrdersByCustomerID) // ดูออเดอร์ของตัวเอง (ลูกค้า)
-	// order.Get("/restaurant", orderHandler.GetOrdersByRestaurantID) // ดูออเดอร์ที่สั่งเข้าร้าน (เจ้าของร้าน)
-	// order.Patch("/cancel/:id", orderHandler.CancelOrder) // ยกเลิกออเดอร์ (ลูกค้า)
+	// Customer
+	order.Post("/", middleware.RoleRequired("user"), orderHandler.CreateOrder)
+	order.Get("/my", middleware.RoleRequired("user"), orderHandler.GetMyOrders)
+	order.Patch("/cancel/:id", middleware.RoleRequired("user"), orderHandler.CancelOrder)
+	// Restaurant
+	order.Get("/restaurant", middleware.RoleRequired("rest"), orderHandler.GetRestaurantOrders)
+	order.Patch("/accept/:id", middleware.RoleRequired("rest"), orderHandler.AcceptOrder)
+	order.Patch("/reject/:id", middleware.RoleRequired("rest"), orderHandler.RejectOrder)
+	order.Patch("/prepare/:id", middleware.RoleRequired("rest"), orderHandler.PrepareOrder)
+	order.Patch("/ready/:id", middleware.RoleRequired("rest"), orderHandler.ReadyOrder)
+	// Rider
+	order.Get("/ready", middleware.RoleRequired("rider"), orderHandler.GetReadyOrders)
+	order.Get("/rider/my", middleware.RoleRequired("rider"), orderHandler.GetRiderOrders)
+	order.Patch("/pickup/:id", middleware.RoleRequired("rider"), orderHandler.PickUpOrder)
+	order.Patch("/deliver/:id", middleware.RoleRequired("rider"), orderHandler.DeliverOrder)
+	// Detail (ต้องอยู่หลัง named routes ไม่งั้น /:id จะ match ก่อน)
+	order.Get("/:id", orderHandler.GetOrderByID)
+
+	// ─── WebSocket routes ─────────────────────────────────────────────
+	wsGroup := app.Group("/ws", wsHandler.UpgradeCheck())
+	wsGroup.Get("/restaurant/:restaurant_id", wsHandler.RestaurantWS())
+	wsGroup.Get("/rider", wsHandler.RiderWS())
+	wsGroup.Get("/customer", wsHandler.CustomerWS())
 
 	fmt.Printf("server is running on port %s\n", cfg.App.Port)
 	if err := app.Listen(fmt.Sprintf(":%s", cfg.App.Port)); err != nil {

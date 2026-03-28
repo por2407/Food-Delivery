@@ -189,3 +189,44 @@ func (h *AuthHandler) GetProfile(c *fiber.Ctx) error {
 		"data":    profile,
 	})
 }
+
+// ─── Google OAuth Handlers ──────────────────────────────────────────
+
+func (h *AuthHandler) GoogleLogin(c *fiber.Ctx) error {
+	url, err := h.service.GoogleLogin(c.Context())
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+	return c.Redirect(url)
+}
+
+func (h *AuthHandler) GoogleCallback(c *fiber.Ctx) error {
+	code := c.Query("code")
+	if code == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Code not found",
+		})
+	}
+
+	result, err := h.service.GoogleCallback(c.Context(), code)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	// Access token → HttpOnly Cookie อายุ 7 วัน
+	c.Cookie(&fiber.Cookie{
+		Name:     "access_token",
+		Value:    result.AccessToken,
+		Expires:  time.Now().Add(7 * 24 * time.Hour),
+		HTTPOnly: true,
+		Secure:   h.cfg.App.Env == "prod",
+		SameSite: "Lax",
+	})
+
+	// Redirect กลับหน้าแรก หรือหน้าเดิม (ในโปรเจคจริงอาจใช้ state เก็บ URL ปลายทาง)
+	return c.Redirect("http://localhost:5173/")
+}

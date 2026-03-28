@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"food_delivery/internal/adapters/middleware"
+	"food_delivery/internal/core/domain"
 	"food_delivery/internal/core/ports"
 
 	"github.com/gofiber/fiber/v2"
@@ -75,14 +76,46 @@ func (h *RestaurantHandler) EditRestaurant(c *fiber.Ctx) error {
 }
 
 func (h *RestaurantHandler) GetRestaurantAll(c *fiber.Ctx) error {
-	result, err := h.restaurantService.GetRestaurantAll(c.Context())
+	page := c.QueryInt("page", 1)
+	limit := c.QueryInt("limit", 10)
+	foodType := c.Query("food_type", "")
+
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 10
+	}
+
+	result, total, err := h.restaurantService.GetRestaurantAll(c.Context(), page, limit, foodType)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 	return c.JSON(fiber.Map{
 		"message": "Get all restaurants successfully",
 		"data":    result,
+		"meta": fiber.Map{
+			"total": total,
+			"page":  page,
+			"limit": limit,
+		},
 	})
+}
+
+// GetRestaurantByID — GET /restaurants/:id (public)
+func (h *RestaurantHandler) GetRestaurantByID(c *fiber.Ctx) error {
+	restaurantID, err := c.ParamsInt("id")
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid restaurant ID"})
+	}
+	result, err := h.restaurantService.GetRestaurantByID(c.Context(), restaurantID)
+	if err != nil {
+		if err.Error() == "restaurant not found" {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"data": result})
 }
 
 func (h *RestaurantHandler) CloseOrOpenRestaurant(c *fiber.Ctx) error {
@@ -115,5 +148,13 @@ func (h *RestaurantHandler) CloseOrOpenRestaurant(c *fiber.Ctx) error {
 	}
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Restaurant " + txtStatus + " successfully",
+	})
+}
+
+// GetFoodTypes — GET /api/food-types (public)
+// คืนค่ารายการ food_type มาตรฐานทั้งหมดที่ระบบรองรับ
+func (h *RestaurantHandler) GetFoodTypes(c *fiber.Ctx) error {
+	return c.JSON(fiber.Map{
+		"data": domain.StandardFoodTypes,
 	})
 }

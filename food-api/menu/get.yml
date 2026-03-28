@@ -6,6 +6,9 @@ info:
 http:
   method: GET
   url: http://localhost:3000/api/menu/1
+  headers:
+    - name: set-cookie
+      value: "\taccess_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImpvYkBnbWFpbC5jb20iLCJleHAiOjE3NzQ2ODI5OTksImlhdCI6MTc3NDU5NjU5OSwicm9sZSI6InJlc3QiLCJ1c2VyX2lkIjo2fQ.UIR4qAnRcFtV5ftHb8Yv7E407aCdt2EM_de6HnBFt8w; expires=Fri, 03 Apr 2026 07:29:59 GMT; path=/; HttpOnly; SameSite=Lax"
   auth: inherit
 
 settings:
