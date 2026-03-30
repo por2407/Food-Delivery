@@ -1,10 +1,23 @@
+import { useNavigate } from "react-router-dom";
 import { useRestaurantStore } from "../store/useRestaurantStore";
 
 const HERO_FOOD_IMAGE = "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80";
 const HERO_RESTAURANT_IMAGE = "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=600&q=80";
 
 export default function HeroSection() {
-  const { searchTerm, setSearchTerm } = useRestaurantStore();
+  const { searchTerm, setSearchTerm, setSelectedFoodType } = useRestaurantStore();
+  const navigate = useNavigate();
+
+  const handleSearch = () => {
+    setSelectedFoodType(null); // Clear category filter for global search
+    navigate("/search");
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      handleSearch();
+    }
+  };
 
   return (
     <section className="relative px-6 py-12 md:py-24 max-w-7xl mx-auto overflow-hidden animate-fade-in">
@@ -46,9 +59,13 @@ export default function HeroSection() {
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={handleKeyDown}
               />
             </div>
-            <button className="bg-linear-to-r from-primary to-primary-container text-on-primary px-10 py-4 rounded-full font-headline font-bold shadow-lg shadow-primary/20 active:scale-95 transition-all hover:shadow-primary/30">
+            <button
+              onClick={handleSearch}
+              className="bg-linear-to-r from-primary to-primary-container text-on-primary px-10 py-4 rounded-full font-headline font-bold shadow-lg shadow-primary/20 active:scale-95 transition-all hover:shadow-primary/30"
+            >
               ค้นหา
             </button>
           </div>

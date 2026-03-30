@@ -47,6 +47,7 @@ func (s *AuthService) Register(ctx context.Context, req ports.RegisterRequest) (
 		Password: string(hashedPassword),
 		Name:     req.Name,
 		Role:     req.Role,
+		Phone:    req.Phone,
 	}); err != nil {
 		return nil, fmt.Errorf("failed to register user: %w", err)
 	}

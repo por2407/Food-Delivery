@@ -1,10 +1,20 @@
+import { useEffect } from "react";
 import TopNavBar from "../components/TopNavBar";
 import HeroSection from "../components/HeroSection";
 import CategorySection from "../components/CategorySection";
 import RestaurantGrid from "../components/RestaurantGrid";
 import Footer from "../components/Footer";
+import { useRestaurantStore } from "../store/useRestaurantStore";
 
 export default function HomePage() {
+  const { setSearchTerm, setSelectedFoodType } = useRestaurantStore();
+
+  useEffect(() => {
+    // รีเซ็ตการค้นหาและตัวกรองเมื่อกลับมาหน้าหลัก เพื่อให้เห็นร้านค้าทั้งหมดแบบ Clean State
+    setSearchTerm("");
+    setSelectedFoodType(null);
+  }, [setSearchTerm, setSelectedFoodType]);
+
   return (
     <div className="min-h-screen bg-surface selection:bg-primary-container selection:text-on-primary-container">
       {/* Decorative Glow Backgrounds */}

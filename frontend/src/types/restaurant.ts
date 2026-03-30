@@ -15,6 +15,7 @@ export interface Restaurant {
   is_active: boolean;
   created_at: string;
   rating?: number;
+  status?: "Y" | "N";  // โดน admin ปิดร้านหรือไม่ (สำหรับ admin page)
 }
 
 // ── FoodType ──────────────────────────────────────────────────────
@@ -23,4 +24,16 @@ export interface FoodType {
   key: string; // "Thai", "Japanese" ฯลฯ — เก็บใน DB
   label: string; // "อาหารไทย" — แสดงผลบนหน้าจอ
   image_url: string; // URL รูปภาพสำหรับหน้าหมวดหมู่
+}
+
+// ── MenuItem ──────────────────────────────────────────────────────
+export interface MenuItem {
+  id: number;
+  restaurant_id: number;
+  category: string;
+  name: string;
+  description: string;
+  price: number;
+  image_url: string;
+  is_available: boolean;
 }

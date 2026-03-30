@@ -67,15 +67,13 @@ type AuthServicePort interface {
 }
 
 type CreateRestaurantRequest struct {
-	Name        string    `json:"name" validate:"required"`
-	Description string    `json:"description"`
-	Address     string    `json:"address" validate:"required"`
-	Lat         float64   `json:"lat"`
-	Lng         float64   `json:"lng"`
-	ImageUrl    string    `json:"image_url"`
-	FoodType    string    `json:"food_type"`
-	OpenTime    time.Time `json:"open_time"`
-	CloseTime   time.Time `json:"close_time"`
+	Name        string  `json:"name" validate:"required"`
+	Description string  `json:"description"`
+	Address     string  `json:"address" validate:"required"`
+	Lat         float64 `json:"lat"`
+	Lng         float64 `json:"lng"`
+	ImageUrl    string  `json:"image_url"`
+	FoodType    string  `json:"food_type"`
 }
 
 type RestaurantResponse struct {
@@ -88,23 +86,20 @@ type RestaurantResponse struct {
 	Lng         float64   `json:"lng"`
 	ImageUrl    string    `json:"image_url"`
 	FoodType    string    `json:"food_type"`
-	OpenTime    time.Time `json:"open_time"`
-	CloseTime   time.Time `json:"close_time"`
 	IsActive    bool      `json:"is_active"`
+	Status      string    `json:"status"`
 	CreatedAt   time.Time `json:"created_at"`
 }
 
 type EditRestaurantRequest struct {
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	Address     string    `json:"address"`
-	Lat         float64   `json:"lat"`
-	Lng         float64   `json:"lng"`
-	ImageUrl    string    `json:"image_url"`
-	FoodType    string    `json:"food_type"`
-	OpenTime    time.Time `json:"open_time"`
-	CloseTime   time.Time `json:"close_time"`
-	IsActive    bool      `json:"is_active"`
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	Address     string  `json:"address"`
+	Lat         float64 `json:"lat"`
+	Lng         float64 `json:"lng"`
+	ImageUrl    string  `json:"image_url"`
+	FoodType    string  `json:"food_type"`
+	IsActive    bool    `json:"is_active"`
 }
 
 type RestaurantServicePort interface {
@@ -112,6 +107,7 @@ type RestaurantServicePort interface {
 	EditRestaurant(ctx context.Context, restaurantID int, ownerID int, req EditRestaurantRequest) (*RestaurantResponse, error)
 	GetRestaurantAll(ctx context.Context, page int, limit int, foodType string) ([]*RestaurantResponse, int64, error)
 	GetRestaurantByID(ctx context.Context, restaurantID int) (*RestaurantResponse, error)
+	GetRestaurantByOwnerID(ctx context.Context, ownerID int) (*RestaurantResponse, error)
 	CloseOrOpenRestaurant(ctx context.Context, restaurantID int, isActive bool) error
 }
 
@@ -121,7 +117,6 @@ type CreateMenuItemRequest struct {
 	Description string  `json:"description"`
 	Price       float64 `json:"price"`
 	ImageURL    string  `json:"image_url"`
-	Stock       int     `json:"stock"`
 }
 
 type MenuItemServicePort interface {

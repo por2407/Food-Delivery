@@ -17,8 +17,7 @@ http:
           "name": "ข้าวผัดกุ้ง",
           "description": "ข้าวผัดกุ้งสดใหม่ หอมกลิ่นน้ำมันงา",
           "price": 85.00,
-          "image_url": "https://example.com/friedrice-shrimp.jpg",
-          "stock": 30
+          "image_url": "https://example.com/friedrice-shrimp.jpg"
         }
   auth: inherit
 

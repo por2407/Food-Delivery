@@ -33,8 +33,6 @@ func (s *RestaurantService) AddRestaurant(ctx context.Context, ownerID int, req 
 		Lng:         req.Lng,
 		Image_url:   req.ImageUrl,
 		Food_type:   req.FoodType,
-		Open_time:   req.OpenTime,
-		Close_time:  req.CloseTime,
 		Is_active:   true,
 	}
 
@@ -69,8 +67,6 @@ func (s *RestaurantService) EditRestaurant(ctx context.Context, restaurantID int
 		Lng:         req.Lng,
 		Image_url:   req.ImageUrl,
 		Food_type:   req.FoodType,
-		Open_time:   req.OpenTime,
-		Close_time:  req.CloseTime,
 		Is_active:   req.IsActive,
 	}
 
@@ -108,6 +104,17 @@ func (s *RestaurantService) GetRestaurantByID(ctx context.Context, restaurantID 
 	return toRestaurantResponse(restaurant), nil
 }
 
+func (s *RestaurantService) GetRestaurantByOwnerID(ctx context.Context, ownerID int) (*ports.RestaurantResponse, error) {
+	restaurant, err := s.restaurantRepo.FindRestaurantByOwnerID(ctx, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	if restaurant == nil {
+		return nil, nil // ยังไม่มีร้าน — ไม่ใช่ error
+	}
+	return toRestaurantResponse(restaurant), nil
+}
+
 // helper map domain → response
 func toRestaurantResponse(r *domain.Restaurant) *ports.RestaurantResponse {
 	return &ports.RestaurantResponse{
@@ -120,9 +127,8 @@ func toRestaurantResponse(r *domain.Restaurant) *ports.RestaurantResponse {
 		Lng:         r.Lng,
 		ImageUrl:    r.Image_url,
 		FoodType:    r.Food_type,
-		OpenTime:    r.Open_time,
-		CloseTime:   r.Close_time,
 		IsActive:    r.Is_active,
+		Status:      r.Status,
 		CreatedAt:   r.CreatedAt,
 	}
 }

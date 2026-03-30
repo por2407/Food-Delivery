@@ -13,15 +13,15 @@ http:
     type: json
     data: |-
       {
-        "name": "My Restaurant",
-        "description": "A great place to eat",
-        "address": "123 Main St, Bangkok",
-        "lat": 13.7563,
-        "lng": 100.5018,
-        "image_url": "https://example.com/image.jpg",
-        "food_type": "Thai",
-        "open_time": "2024-01-01T09:00:00Z",
-        "close_time": "2024-01-01T22:00:00Z"
+        "name": "Teppen Sathorn",
+        "description": "ร้านอาหารญี่ปุ่นสไตล์อิซากายะ เด่นด้วยเมนู Warayaki อบควันฟาง บรรยากาศคึกคัก",
+        "address": "48 ซอยสาทร 8 แขวงสีลม เขตบางรัก กรุงเทพฯ",
+        "lat": 13.723076,
+        "lng": 100.531126,
+        "image_url": null,
+        "food_type": "Japanese",
+        "open_time": "2024-01-01T11:00:00Z",
+        "close_time": "2024-01-02T00:00:00Z"
       }
   auth: inherit
 

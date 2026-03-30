@@ -158,3 +158,17 @@ func (h *RestaurantHandler) GetFoodTypes(c *fiber.Ctx) error {
 		"data": domain.StandardFoodTypes,
 	})
 }
+
+// GetMyRestaurant — GET /restaurants/my (role: rest)
+func (h *RestaurantHandler) GetMyRestaurant(c *fiber.Ctx) error {
+	ownerID := c.Locals(middleware.LocalUserID).(int)
+	result, err := h.restaurantService.GetRestaurantByOwnerID(c.Context(), ownerID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	// result == nil หมายถึงยังไม่มีร้าน → บอก frontend ผ่าน has_restaurant แทนการ throw 404
+	return c.JSON(fiber.Map{
+		"has_restaurant": result != nil,
+		"data":           result,
+	})
+}

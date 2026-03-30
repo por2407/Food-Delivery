@@ -94,6 +94,8 @@ func main() {
 	api.Get("/auth/google/callback", authHandler.GoogleCallback)
 
 	api.Get("/restaurants", restaurantHandler.GetRestaurantAll)
+	// /restaurants/my ต้อง register ก่อน /:id เสมอ ไม่งั้น Fiber match "my" เป็น int ID
+	api.Get("/restaurants/my", middleware.AuthRequired(cfg), middleware.RoleRequired("rest"), restaurantHandler.GetMyRestaurant)
 	api.Get("/restaurants/:id", restaurantHandler.GetRestaurantByID)
 	api.Get("/food-types", restaurantHandler.GetFoodTypes)
 	api.Get("/menu/:restaurant_id", middleware.OptionalAuth(cfg), menuItemHandler.GetMenuItemAllByID)

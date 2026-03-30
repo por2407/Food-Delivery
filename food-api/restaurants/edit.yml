@@ -22,7 +22,7 @@ http:
         "food_type": "Thai",
         "open_time": "2024-01-01T11:00:00Z",
         "close_time": "2024-01-01T21:30:00Z",
-        "is_active": false
+        "is_active": true
       }
   auth: inherit
 

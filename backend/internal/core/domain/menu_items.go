@@ -13,7 +13,6 @@ type MenuItem struct {
 	Price        float64    `gorm:"column:price" json:"price"`
 	ImageURL     string     `gorm:"column:image_url" json:"image_url"`
 	Is_available bool       `gorm:"column:is_available;default:true" json:"is_available"`
-	Stock        int        `gorm:"column:stock" json:"stock"`
 	CreatedAt    time.Time  `gorm:"column:created_at" json:"created_at"`
 	UpdatedAt    time.Time  `gorm:"column:updated_at" json:"updated_at"`
 	DeletedAt    *time.Time `gorm:"column:deleted_at" json:"deleted_at,omitempty"`

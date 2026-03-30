@@ -47,7 +47,8 @@ func (r *RestaurantRepository) FindRestaurantByOwnerID(ctx context.Context, owne
 }
 
 func (r *RestaurantRepository) EditRestaurant(ctx context.Context, restaurant *domain.Restaurant) error {
-	result := r.db.WithContext(ctx).Model(&domain.Restaurant{}).Where("id = ?", restaurant.ID).Updates(map[string]interface{}{
+	// ใช้ Model(&domain.Restaurant{}) และ Updates(map) เพื่อให้ GORM อัปเดตทุกฟีลด์รวมถึงค่าที่เป็น Zero values (เช่น 0, false, "")
+	updates := map[string]interface{}{
 		"name":        restaurant.Name,
 		"description": restaurant.Description,
 		"address":     restaurant.Address,
@@ -55,10 +56,10 @@ func (r *RestaurantRepository) EditRestaurant(ctx context.Context, restaurant *d
 		"lng":         restaurant.Lng,
 		"image_url":   restaurant.Image_url,
 		"food_type":   restaurant.Food_type,
-		"open_time":   restaurant.Open_time,
-		"close_time":  restaurant.Close_time,
 		"is_active":   restaurant.Is_active,
-	})
+	}
+
+	result := r.db.WithContext(ctx).Model(&domain.Restaurant{}).Where("id = ?", restaurant.ID).Updates(updates)
 	if result.Error != nil {
 		return result.Error
 	}
@@ -71,7 +72,7 @@ func (r *RestaurantRepository) EditRestaurant(ctx context.Context, restaurant *d
 func (r *RestaurantRepository) FindAllRestaurants(ctx context.Context, page int, limit int, foodType string) ([]*domain.Restaurant, int64, error) {
 	var restaurants []*domain.Restaurant
 	var total int64
-	query := r.db.WithContext(ctx).Model(&domain.Restaurant{}).Where("status = ?", "Y")
+	query := r.db.WithContext(ctx).Model(&domain.Restaurant{}).Where("is_active = ?", true)
 
 	if foodType != "" {
 		query = query.Where("food_type = ?", foodType)
@@ -93,7 +94,7 @@ func (r *RestaurantRepository) FindAllRestaurants(ctx context.Context, page int,
 
 func (r *RestaurantRepository) UpdateCloseOrOpenStatus(ctx context.Context, restaurantID int, isActive bool) error {
 	result := r.db.WithContext(ctx).Model(&domain.Restaurant{}).Where("id = ?", restaurantID).Update("is_active", isActive)
-	if result.Error != nil{
+	if result.Error != nil {
 		return result.Error
 	}
 	if result.RowsAffected == 0 {
@@ -101,4 +102,3 @@ func (r *RestaurantRepository) UpdateCloseOrOpenStatus(ctx context.Context, rest
 	}
 	return nil
 }
-

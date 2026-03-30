@@ -37,7 +37,6 @@ func (s *MenuService) CreateMenuItem(ctx context.Context, ownerID int, restauran
 		Category:     req.Category,
 		Price:        req.Price,
 		ImageURL:     req.ImageURL,
-		Stock:        req.Stock,
 	}
 	if err := s.menuItemRepo.CreateMenuItem(ctx, menuItem); err != nil {
 		return nil, err
@@ -77,7 +76,6 @@ func (s *MenuService) EditMenuItem(ctx context.Context, ownerID int, menuItemID 
 	existing.Description = req.Description
 	existing.Price = req.Price
 	existing.ImageURL = req.ImageURL
-	existing.Stock = req.Stock
 
 	if err := s.menuItemRepo.UpdateMenuItem(ctx, existing); err != nil {
 		return nil, err

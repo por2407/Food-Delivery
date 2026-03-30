@@ -19,7 +19,8 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     // ดึง error message จาก Backend ถ้ามี
-    const message = error.response?.data?.error || error.message || "Something went wrong";
+    const message =
+      error.response?.data?.error || error.message || "Something went wrong";
     return Promise.reject(new Error(message));
-  }
+  },
 );
