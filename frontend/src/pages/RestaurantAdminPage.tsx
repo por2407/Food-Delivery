@@ -25,6 +25,7 @@ export default function RestaurantAdminPage() {
   const [showMenuModal, setShowMenuModal] = useState(false);
   const [foodTypes, setFoodTypes] = useState<FoodType[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [editingMenuItemId, setEditingMenuItemId] = useState<number | null>(null);
   const [restaurantForm, setRestaurantForm] = useState({
     name: "", description: "", address: "", food_type: "", image_url: "",
     lat: 13.7563, lng: 100.5018,
@@ -52,12 +53,12 @@ export default function RestaurantAdminPage() {
       }
 
       setRestaurant(res.data);
-      
+
       const [mItems, rOrders] = await Promise.all([
         menuService.getMenuItemsByRestaurant(res.data.id),
         orderService.getRestaurantOrders()
       ]);
-      
+       
       setMenuItems(mItems);
       setOrders(rOrders);
       setErrorStatus(null);
@@ -98,6 +99,23 @@ export default function RestaurantAdminPage() {
     }
   };
 
+  const handleOpenMenuModal = (item?: MenuItem) => {
+    if (item) {
+      setEditingMenuItemId(item.id);
+      setMenuForm({
+        name: item.name,
+        category: item.category || "",
+        description: item.description || "",
+        price: String(item.price || ""),
+        image_url: item.image_url || "",
+      });
+    } else {
+      setEditingMenuItemId(null);
+      setMenuForm({ name: "", category: "", description: "", price: "", image_url: "" });
+    }
+    setShowMenuModal(true);
+  };
+
   const handleSaveRestaurant = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
@@ -125,20 +143,25 @@ export default function RestaurantAdminPage() {
     }
   };
 
-  const handleCreateMenuItem = async (e: React.FormEvent) => {
+  const handleSaveMenuItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!restaurant) return;
     setSubmitting(true);
+    const payload = {
+      name: menuForm.name,
+      category: menuForm.category,
+      description: menuForm.description,
+      price: parseFloat(menuForm.price),
+      image_url: menuForm.image_url,
+    };
+
     try {
-      await menuService.createMenuItem(restaurant.id, {
-        name: menuForm.name,
-        category: menuForm.category,
-        description: menuForm.description,
-        price: parseFloat(menuForm.price),
-        image_url: menuForm.image_url,
-      });
+      if (!editingMenuItemId) {
+        await menuService.createMenuItem(restaurant.id, payload);
+      } else {
+        await menuService.editMenuItem(restaurant.id, editingMenuItemId, payload);
+      }
       setShowMenuModal(false);
-      setMenuForm({ name: "", category: "", description: "", price: "", image_url: "" });
       await fetchData();
     } catch (err: any) {
       alert(err?.response?.data?.error || "เกิดข้อผิดพลาด");
@@ -222,7 +245,7 @@ export default function RestaurantAdminPage() {
             </div>
             <div className="flex gap-4">
               <button onClick={() => handleOpenRestaurantModal(true)} className="bg-surface-container-high px-8 py-4 rounded-2xl font-black italic hover:bg-on-surface hover:text-surface transition-all">แก้ไขข้อมูลร้าน</button>
-              <button onClick={() => setShowMenuModal(true)} className="btn-primary px-8 py-4 rounded-2xl font-black italic shadow-xl">เพิ่มเมนูใหม่</button>
+              <button onClick={handleOpenMenuModal} className="btn-primary px-8 py-4 rounded-2xl font-black italic shadow-xl">เพิ่มเมนูใหม่</button>
             </div>
           </header>
 
@@ -290,7 +313,7 @@ export default function RestaurantAdminPage() {
               <div className="bg-surface-container-low p-8 rounded-[2.5rem] border border-outline-variant/10">
                 <div className="flex justify-between items-center mb-6">
                   <h4 className="font-black text-sm uppercase tracking-widest">จัดการเมนูอาหาร ({menuItems.length})</h4>
-                  <button onClick={() => setShowMenuModal(true)} className="text-primary font-black text-xs uppercase tracking-widest hover:underline">+ เพิ่ม</button>
+                  <button onClick={handleOpenMenuModal} className="text-primary font-black text-xs uppercase tracking-widest hover:underline">+ เพิ่ม</button>
                 </div>
                 <div className="space-y-6 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
                   {menuItems.map((item) => (
@@ -302,12 +325,16 @@ export default function RestaurantAdminPage() {
                           <p className="text-[10px] font-black text-primary">฿{item.price}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
                         <button 
                           onClick={() => handleToggleMenuAvailable(item.id, item.is_available)}
-                          className={`w-10 h-6 rounded-full relative px-1 flex items-center transition-all ${item.is_available ? 'bg-emerald-500 justify-end' : 'bg-outline-variant justify-start'}`}
+                          title={item.is_available ? 'ปิดเมนูชั่วคราว' : 'เปิดขาย'}
+                          className={`w-10 h-6 rounded-full relative px-1 flex items-center transition-all shrink-0 ${item.is_available ? 'bg-emerald-500 justify-end' : 'bg-outline-variant justify-start'}`}
                         >
                           <div className="w-4 h-4 bg-white rounded-full shadow-sm" />
+                        </button>
+                        <button onClick={() => handleOpenMenuModal(item)} className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-primary/10 transition-all">
+                          <span className="material-symbols-outlined text-lg">edit</span>
                         </button>
                         <button onClick={() => handleDeleteMenuItem(item.id)} className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:text-error hover:bg-error/10 transition-all">
                           <span className="material-symbols-outlined text-lg">delete</span>
@@ -382,22 +409,91 @@ export default function RestaurantAdminPage() {
               <label className="input-label mb-2">ที่อยู่ร้าน *</label>
               <input className="input-field" required value={restaurantForm.address} onChange={e => setRestaurantForm(p => ({ ...p, address: e.target.value }))} />
             </div>
+            <div>
+              <label className="input-label mb-2">คำอธิบายร้าน</label>
+              <textarea className="input-field resize-none" rows={2} placeholder="เล่าให้ลูกค้ารู้จักร้านของคุณ" value={restaurantForm.description} onChange={e => setRestaurantForm(p => ({ ...p, description: e.target.value }))} />
+            </div>
+            <div>
+              <label className="input-label mb-2">ประเภทอาหาร *</label>
+              <select required className="input-field" value={restaurantForm.food_type} onChange={e => setRestaurantForm(p => ({ ...p, food_type: e.target.value }))}>
+                <option value="">-- เลือกประเภทอาหาร --</option>
+                {foodTypes.map(ft => (
+                  <option key={ft.key} value={ft.key}>{ft.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="input-label mb-2">URL รูปภาพหน้าปกร้าน</label>
+              <input className="input-field" placeholder="https://..." value={restaurantForm.image_url} onChange={e => setRestaurantForm(p => ({ ...p, image_url: e.target.value }))} />
+              {restaurantForm.image_url && (
+                <div className="mt-3 rounded-2xl overflow-hidden border border-outline-variant/20 bg-surface-container-high">
+                  <img
+                    src={restaurantForm.image_url}
+                    alt="preview"
+                    className="w-full h-44 object-cover"
+                    onError={e => { (e.target as HTMLImageElement).parentElement!.style.display = 'none' }}
+                    onLoad={e => { (e.target as HTMLImageElement).parentElement!.style.display = '' }}
+                  />
+                </div>
+              )}
+            </div>
             <MapPicker onSelect={(lat, lng) => setRestaurantForm(p => ({ ...p, lat, lng }))} initialPos={[restaurantForm.lat, restaurantForm.lng]} />
-            <div className="flex gap-4">
+            <div className="flex gap-4 pt-2">
               <button type="button" onClick={() => setShowRestaurantModal(false)} className="flex-1 py-4 rounded-2xl bg-surface-container-high">ยกเลิก</button>
               <button type="submit" disabled={submitting} className="btn-primary flex-1 py-4 rounded-2xl">{submitting ? "กำลังบันทึก..." : "บันทึกข้อมูล"}</button>
             </div>
           </form>
         </Modal>
 
-        <Modal isOpen={showMenuModal} onClose={() => setShowMenuModal(false)} title="เพิ่มเมนูใหม่">
-          <form onSubmit={handleCreateMenuItem} className="space-y-5">
-            <input className="input-field" required placeholder="ชื่อเมนู" value={menuForm.name} onChange={e => setMenuForm(p => ({ ...p, name: e.target.value }))} />
-            <input className="input-field" type="number" required placeholder="ราคา" value={menuForm.price} onChange={e => setMenuForm(p => ({ ...p, price: e.target.value }))} />
-            <input className="input-field" placeholder="URL รูปภาพ" value={menuForm.image_url} onChange={e => setMenuForm(p => ({ ...p, image_url: e.target.value }))} />
-            <div className="flex gap-4">
+        <Modal isOpen={showMenuModal} onClose={() => setShowMenuModal(false)} title={editingMenuItemId !== null ? "แก้ไขเมนู" : "เพิ่มเมนูใหม่"}>
+          <form onSubmit={handleSaveMenuItem} className="space-y-5">
+            <div>
+              <label className="input-label mb-2">หมวดหมู่</label>
+              <input
+                className="input-field"
+                list="menu-categories"
+                placeholder="พิมพ์ใหม่ หรือเลือกจากที่เคยเพิ่ม..."
+                value={menuForm.category}
+                onChange={e => setMenuForm(p => ({ ...p, category: e.target.value }))}
+              />
+              <datalist id="menu-categories">
+                {Array.from(new Set(menuItems.map(i => i.category).filter(Boolean))).map(cat => (
+                  <option key={cat} value={cat} />
+                ))}
+              </datalist>
+            </div>
+            <div>
+              <label className="input-label mb-2">ชื่อเมนู *</label>
+              <input className="input-field" required placeholder="เช่น ข้าวหน้าหมูสามชั้นย่าง" value={menuForm.name} onChange={e => setMenuForm(p => ({ ...p, name: e.target.value }))} />
+            </div>
+            <div>
+              <label className="input-label mb-2">คำอธิบาย</label>
+              <textarea className="input-field resize-none" rows={3} placeholder="เช่น หมูสามชั้นย่างไฟอ่อนนาน เสิร์ฟบนข้าวญี่ปุ่นหุงสด" value={menuForm.description} onChange={e => setMenuForm(p => ({ ...p, description: e.target.value }))} />
+            </div>
+            <div>
+              <label className="input-label mb-2">ราคา (บาท) *</label>
+              <input className="input-field" type="number" required min="0" step="0.01" placeholder="220.00" value={menuForm.price} onChange={e => setMenuForm(p => ({ ...p, price: e.target.value }))} />
+            </div>
+            <div>
+              <label className="input-label mb-2">URL รูปภาพ</label>
+              <input className="input-field" placeholder="https://..." value={menuForm.image_url} onChange={e => setMenuForm(p => ({ ...p, image_url: e.target.value }))} />
+              {menuForm.image_url && (
+                <div className="mt-3 rounded-2xl overflow-hidden border border-outline-variant/20 bg-surface-container-high">
+                  <img
+                    src={menuForm.image_url}
+                    alt="preview"
+                    className="w-full h-44 object-cover"
+                    onError={e => { (e.target as HTMLImageElement).parentElement!.style.display = 'none' }}
+                    onLoad={e => { (e.target as HTMLImageElement).parentElement!.style.display = '' }}
+                  />
+                </div>
+              )}
+            </div>
+            <div className="flex gap-4 pt-2">
               <button type="button" onClick={() => setShowMenuModal(false)} className="flex-1 py-4 rounded-2xl bg-surface-container-high">ยกเลิก</button>
-              <button type="submit" disabled={submitting} className="btn-primary flex-1 py-4 rounded-2xl">เพิ่มเมนู</button>
+              <button type="submit" disabled={submitting} className="btn-primary flex-1 py-4 rounded-2xl">
+                {submitting ? "กำลังบันทึก..." : editingMenuItemId !== null ? "บันทึกการแก้ไข" : "เพิ่มเมนู"}
+              </button>
             </div>
           </form>
         </Modal>

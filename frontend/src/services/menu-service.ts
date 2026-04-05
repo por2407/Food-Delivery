@@ -23,6 +23,22 @@ export const menuService = {
     return response.data.data;
   },
 
+  /** แก้ไขข้อมูลเมนู (role: rest) */
+  async editMenuItem(
+    restaurantId: number,
+    menuId: number,
+    data: {
+      name: string;
+      category?: string;
+      description?: string;
+      price: number;
+      image_url?: string;
+    },
+  ): Promise<MenuItem> {
+    const response = await api.put<{ data: MenuItem }>(`/menu/${restaurantId}/${menuId}`, data);
+    return response.data.data;
+  },
+
   /** เปลี่ยนสถานะเปิด-ปิดเมนู (isAvailable: true = พร้อมขาย, false = หมดชั่วคราว) */
   async toggleAvailable(restaurantId: number, menuId: number, isAvailable: boolean): Promise<void> {
     await api.patch(`/menu/close/${restaurantId}/${menuId}`, { is_available: isAvailable });

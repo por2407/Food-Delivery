@@ -47,6 +47,11 @@ export const orderService = {
     return response.data.data;
   },
 
+  async getRestaurantOrders(): Promise<Order[]> {
+    const response = await api.get<{ data: Order[] }>(`/orders/restaurant`);
+    return response.data.data || [];
+  },
+
   async getMyOrders(): Promise<Order[]> {
     const response = await api.get<{ data: Order[] }>("/orders/my");
     return response.data.data;
