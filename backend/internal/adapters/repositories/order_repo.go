@@ -3,13 +3,11 @@ package repositories
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"food_delivery/internal/core/domain"
 	"food_delivery/internal/core/ports"
 
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 type OrderRepository struct {
@@ -30,7 +28,7 @@ func (r *OrderRepository) CreateOrder(ctx context.Context, order *domain.Order) 
 
 func (r *OrderRepository) FindOrderByID(ctx context.Context, id int) (*domain.Order, error) {
 	var order domain.Order
-	if err := r.db.WithContext(ctx).Preload("Items").Preload("Address").First(&order, id).Error; err != nil {
+	if err := r.db.WithContext(ctx).Preload("Items").Preload("Address").Preload("Customer").Preload("Rider").Preload("Restaurant").First(&order, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
@@ -42,7 +40,8 @@ func (r *OrderRepository) FindOrderByID(ctx context.Context, id int) (*domain.Or
 func (r *OrderRepository) FindOrdersByCustomerID(ctx context.Context, customerID int) ([]*domain.Order, error) {
 	var orders []*domain.Order
 	if err := r.db.WithContext(ctx).
-		Preload("Items").Preload("Address").
+		Preload("Items").Preload("Address").Preload("Rider").Preload("Restaurant").
+		Preload("Review").Preload("ReviewRider").
 		Where("customer_id = ?", customerID).
 		Order("created_at DESC").
 		Find(&orders).Error; err != nil {
@@ -54,21 +53,9 @@ func (r *OrderRepository) FindOrdersByCustomerID(ctx context.Context, customerID
 func (r *OrderRepository) FindOrdersByRestaurantID(ctx context.Context, restaurantID int) ([]*domain.Order, error) {
 	var orders []*domain.Order
 	if err := r.db.WithContext(ctx).
-		Preload("Items").Preload("Address").
+		Preload("Items").Preload("Address").Preload("Rider").Preload("Customer").
 		Where("restaurant_id = ?", restaurantID).
 		Order("created_at DESC").
-		Find(&orders).Error; err != nil {
-		return nil, err
-	}
-	return orders, nil
-}
-
-func (r *OrderRepository) FindOrdersByStatus(ctx context.Context, status string) ([]*domain.Order, error) {
-	var orders []*domain.Order
-	if err := r.db.WithContext(ctx).
-		Preload("Items").Preload("Address").
-		Where("status = ?", status).
-		Order("created_at ASC").
 		Find(&orders).Error; err != nil {
 		return nil, err
 	}
@@ -78,7 +65,7 @@ func (r *OrderRepository) FindOrdersByStatus(ctx context.Context, status string)
 func (r *OrderRepository) FindOrdersByRiderID(ctx context.Context, riderID int) ([]*domain.Order, error) {
 	var orders []*domain.Order
 	if err := r.db.WithContext(ctx).
-		Preload("Items").Preload("Address").
+		Preload("Items").Preload("Address").Preload("Customer").Preload("Restaurant").
 		Where("rider_id = ?", riderID).
 		Order("created_at DESC").
 		Find(&orders).Error; err != nil {
@@ -95,22 +82,45 @@ func (r *OrderRepository) UpdateOrderStatus(ctx context.Context, orderID int, st
 	return result.Error
 }
 
-// AssignRider ใช้ SELECT ... FOR UPDATE เพื่อป้องกัน 2 rider กดรับพร้อมกัน
-func (r *OrderRepository) AssignRider(ctx context.Context, orderID int, riderID int) error {
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var order domain.Order
-		// lock row
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&order, orderID).Error; err != nil {
-			return fmt.Errorf("order not found")
-		}
-		if order.Status != domain.OrderStatusReady {
-			return fmt.Errorf("order is not ready for pickup (current: %s)", order.Status)
-		}
-		if order.RiderID != nil {
-			return fmt.Errorf("order already assigned to another rider")
-		}
-		order.RiderID = &riderID
-		order.Status = domain.OrderStatusPickedUp
-		return tx.Save(&order).Error
-	})
+func (r *OrderRepository) FindBestSellingItems(ctx context.Context, restaurantID int) ([]*domain.BestSellerItem, error) {
+	var results []*domain.BestSellerItem
+	
+	err := r.db.WithContext(ctx).
+		Table("order_items").
+		Select("order_items.menu_item_id as menu_item_id, menu_items.name as name, menu_items.image_url as image_url, sum(order_items.quantity) as sales, orders.restaurant_id as restaurant_id, restaurants.image_url as restaurant_image_url").
+		Joins("INNER JOIN orders ON orders.id = order_items.order_id").
+		Joins("INNER JOIN menu_items ON menu_items.id = order_items.menu_item_id").
+		Joins("INNER JOIN restaurants ON restaurants.id = orders.restaurant_id").
+		Where("orders.restaurant_id = ?", restaurantID).
+		Where("orders.status IN ?", []string{"delivering", "delivered"}).
+		Group("order_items.menu_item_id, menu_items.name, menu_items.image_url, orders.restaurant_id, restaurants.image_url").
+		Order("sales DESC").
+		Limit(5).
+		Scan(&results).Error
+
+	if err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
+func (r *OrderRepository) FindGlobalBestSellingItems(ctx context.Context, limit int) ([]*domain.BestSellerItem, error) {
+	var results []*domain.BestSellerItem
+
+	err := r.db.WithContext(ctx).
+		Table("order_items").
+		Select("order_items.menu_item_id as menu_item_id, menu_items.name as name, menu_items.image_url as image_url, sum(order_items.quantity) as sales, orders.restaurant_id as restaurant_id, restaurants.image_url as restaurant_image_url").
+		Joins("INNER JOIN orders ON orders.id = order_items.order_id").
+		Joins("INNER JOIN menu_items ON menu_items.id = order_items.menu_item_id").
+		Joins("INNER JOIN restaurants ON restaurants.id = orders.restaurant_id").
+		Where("orders.status IN ?", []string{"delivering", "delivered"}).
+		Group("order_items.menu_item_id, menu_items.name, menu_items.image_url, orders.restaurant_id, restaurants.image_url").
+		Order("sales DESC").
+		Limit(limit).
+		Scan(&results).Error
+
+	if err != nil {
+		return nil, err
+	}
+	return results, nil
 }

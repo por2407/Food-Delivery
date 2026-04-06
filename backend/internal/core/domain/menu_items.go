@@ -16,4 +16,8 @@ type MenuItem struct {
 	CreatedAt    time.Time  `gorm:"column:created_at" json:"created_at"`
 	UpdatedAt    time.Time  `gorm:"column:updated_at" json:"updated_at"`
 	DeletedAt    *time.Time `gorm:"column:deleted_at" json:"deleted_at,omitempty"`
+
+	// Calculated fields (not in DB)
+	Rating      float64 `gorm:"-" json:"rating"`
+	ReviewCount int     `gorm:"-" json:"review_count"`
 }

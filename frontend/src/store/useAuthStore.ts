@@ -37,7 +37,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       name: data.name || data.info?.name || data.email?.split('@')[0] || "User",
       role: data.role || data.info?.role || "user",
     };
-    set({ user });
+    set({ user, initialized: true });
   },
 
   checkAuth: async () => {

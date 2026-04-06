@@ -74,7 +74,6 @@ export const restaurantService = {
     image_url?: string;
     lat?: number;
     lng?: number;
-    is_active?: boolean;
   }): Promise<Restaurant> {
     const response = await api.put<{ data: Restaurant; message: string }>(`/restaurants/${id}`, data);
     return response.data.data;

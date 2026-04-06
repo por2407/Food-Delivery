@@ -4,15 +4,13 @@ import (
 	"time"
 )
 
-// Order statuses
+// Order statuses — Rider ควบคุมทั้งหมด
 const (
-	OrderStatusPending   = "pending"   // ลูกค้าสั่งแล้ว รอร้านกดรับ
-	OrderStatusAccepted  = "accepted"  // ร้านกดรับแล้ว
-	OrderStatusPreparing = "preparing" // ร้านกำลังทำอาหาร
-	OrderStatusReady     = "ready"     // อาหารเสร็จแล้ว รอ rider มารับ
-	OrderStatusPickedUp  = "picked_up" // rider รับอาหารแล้ว กำลังไปส่ง
-	OrderStatusDelivered = "delivered" // ส่งถึงลูกค้าแล้ว
-	OrderStatusCancelled = "cancelled" // ยกเลิก
+	OrderStatusPickingUp    = "picking_up"  // rider กำลังไปรับของที่ร้าน
+	OrderStatusAtRestaurant = "at_restaurant" // rider ถึงร้านแล้ว รออาหาร
+	OrderStatusDelivering   = "delivering"  // rider รับของแล้ว กำลังส่งให้ลูกค้า (ร้านได้เงินตอนนี้)
+	OrderStatusDelivered    = "delivered"   // ส่งถึงลูกค้าแล้ว เสร็จสิ้น (rider ได้เงินตอนนี้)
+	OrderStatusCancelled    = "cancelled"   // ยกเลิก
 )
 
 type Order struct {
@@ -28,6 +26,21 @@ type Order struct {
 	CreatedAt    time.Time `gorm:"column:created_at" json:"created_at"`
 	UpdatedAt    time.Time `gorm:"column:updated_at" json:"updated_at"`
 	// relations (preload)
-	Items   []OrderItem `gorm:"foreignKey:OrderID" json:"items,omitempty"`
-	Address *Address    `gorm:"foreignKey:AddressID" json:"address,omitempty"`
+	Items      []OrderItem `gorm:"foreignKey:OrderID" json:"items,omitempty"`
+	Address    *Address    `gorm:"foreignKey:AddressID" json:"address,omitempty"`
+	Customer   *User       `gorm:"foreignKey:CustomerID" json:"customer,omitempty"`
+	Rider      *User       `gorm:"foreignKey:RiderID" json:"rider,omitempty"`
+	Restaurant *Restaurant `gorm:"foreignKey:RestaurantID" json:"restaurant,omitempty"`
+
+	Review      *Review      `gorm:"foreignKey:OrderID" json:"review,omitempty"`
+	ReviewRider *ReviewRider `gorm:"foreignKey:OrderID" json:"review_rider,omitempty"`
+}
+
+type BestSellerItem struct {
+	MenuItemID         int    `gorm:"column:menu_item_id" json:"menu_item_id"`
+	Name               string `gorm:"column:name" json:"name"`
+	ImageURL           string `gorm:"column:image_url" json:"image_url"`
+	Sales              int    `gorm:"column:sales" json:"sales"`
+	RestaurantID       int    `gorm:"column:restaurant_id" json:"restaurant_id"`
+	RestaurantImageURL string `gorm:"column:restaurant_image_url" json:"restaurant_image_url"`
 }

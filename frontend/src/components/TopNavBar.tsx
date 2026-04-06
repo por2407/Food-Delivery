@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useCartStore } from "../store/useCartStore";
 import { useAuthStore } from "../store/useAuthStore";
 
@@ -6,6 +6,7 @@ export default function TopNavBar() {
   const { getTotalItems } = useCartStore();
   const totalItems = getTotalItems();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout } = useAuthStore();
 
   const handleLogout = async () => {
@@ -15,6 +16,8 @@ export default function TopNavBar() {
     }
   };
 
+  const isActive = (path: string) => location.pathname === path;
+
   return (
     <nav className="fixed top-0 w-full z-50 bg-surface/70 backdrop-blur-2xl shadow-[0_4px_24px_rgba(78,33,31,0.06)] border-b border-outline-variant/10">
       <div className="flex justify-between items-center w-full px-6 py-4 max-w-screen-2xl mx-auto">
@@ -22,25 +25,58 @@ export default function TopNavBar() {
           <Link to="/" className="text-2xl font-black text-on-surface italic tracking-tighter hover:opacity-80 transition-opacity decoration-transparent font-headline">
             Gastronomy
           </Link>
-          <div className="hidden md:flex items-center gap-8 font-headline font-semibold tracking-tight">
-            <Link to="/" className="text-primary border-b-2 border-primary pb-1 transition-all duration-300 decoration-transparent">
+          <div className="hidden md:flex items-center gap-8 font-headline font-semibold tracking-tight h-full">
+            <Link 
+              to="/" 
+              className={`pb-1 transition-all duration-300 decoration-transparent ${
+                isActive('/') ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-primary'
+              }`}
+            >
               สำรวจ
             </Link>
             {user && user.role === 'user' && (
-              <Link to="/orders" className="flex items-center gap-1.5 text-on-surface-variant font-medium hover:text-primary transition-all duration-300 decoration-transparent group/link">
+              <Link 
+                to="/orders" 
+                className={`flex items-center gap-1.5 pb-1 transition-all duration-300 decoration-transparent ${
+                  isActive('/orders') ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-primary'
+                }`}
+              >
                 คำสั่งซื้อของฉัน
-                <span className="w-1.5 h-1.5 rounded-full bg-primary opacity-0 group-hover/link:opacity-100 transition-opacity" />
               </Link>
             )}
             {user && user.role === 'rest' && (
-              <Link to="/restaurant-admin" className="flex items-center gap-1.5 text-primary font-black uppercase tracking-widest text-xs hover:opacity-80 transition-all decoration-transparent group/link">
+              <Link 
+                to="/restaurant-admin" 
+                className={`flex items-center gap-1.5 pb-1 font-black uppercase tracking-widest text-[10px] transition-all duration-300 decoration-transparent ${
+                  isActive('/restaurant-admin') ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-primary'
+                }`}
+              >
                 จัดการร้านอาหาร
                 <span className="material-symbols-outlined text-sm">settings</span>
               </Link>
             )}
-            <a href="#" className="text-on-surface-variant font-medium hover:text-primary transition-all duration-300 decoration-transparent">
-              โปรโมชั่น
-            </a>
+            {user && user.role === 'rider' && (
+              <Link 
+                to="/rider" 
+                className={`flex items-center gap-1.5 pb-1 font-black uppercase tracking-widest text-[10px] transition-all duration-300 decoration-transparent ${
+                  isActive('/rider') ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-primary'
+                }`}
+              >
+                แดชบอร์ดไรเดอร์
+                <span className="material-symbols-outlined text-sm">delivery_dining</span>
+              </Link>
+            )}
+            {user && (
+              <Link 
+                to="/rider-reviews" 
+                className={`flex items-center gap-1.5 pb-1 font-black uppercase tracking-widest text-[10px] transition-all duration-300 decoration-transparent ${
+                  isActive('/rider-reviews') ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-primary'
+                }`}
+              >
+                รีวิวไรเดอร์
+                <span className="material-symbols-outlined text-sm">social_leaderboard</span>
+              </Link>
+            )}
           </div>
         </div>
 

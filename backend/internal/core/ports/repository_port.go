@@ -49,10 +49,11 @@ type OrderRepositoryPort interface {
 	FindOrdersByCustomerID(ctx context.Context, customerID int) ([]*domain.Order, error)
 	FindOrdersByRestaurantID(ctx context.Context, restaurantID int) ([]*domain.Order, error)
 	FindOrdersByRiderID(ctx context.Context, riderID int) ([]*domain.Order, error)
-	FindOrdersByStatus(ctx context.Context, status string) ([]*domain.Order, error)
 	UpdateOrderStatus(ctx context.Context, orderID int, status string) error
-	// AssignRider ใช้ transaction ป้องกัน 2 rider กดพร้อมกัน
-	AssignRider(ctx context.Context, orderID int, riderID int) error
+
+	// เมนูขายดีที่สุด by ร้านค้า (Aggregation)
+	FindBestSellingItems(ctx context.Context, restaurantID int) ([]*domain.BestSellerItem, error)
+	FindGlobalBestSellingItems(ctx context.Context, limit int) ([]*domain.BestSellerItem, error)
 	DB() *gorm.DB
 }
 
@@ -63,4 +64,10 @@ type ReviewRepositoryPort interface {
 	FindByRestaurantID(ctx context.Context, restaurantID int) ([]*domain.Review, error)
 	Update(ctx context.Context, review *domain.Review) error
 	Delete(ctx context.Context, id int, customerID int) error
+
+	// Rider Reviews
+	CreateRiderReview(ctx context.Context, review *domain.ReviewRider) error
+	FindRiderReviewByOrderID(ctx context.Context, orderID int) (*domain.ReviewRider, error)
+	FindRiderReviewsByRiderID(ctx context.Context, riderID int) ([]*domain.ReviewRider, error)
+	FindAllRiderStats(ctx context.Context) ([]*domain.RiderStat, error)
 }

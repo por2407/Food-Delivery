@@ -39,13 +39,14 @@ func main() {
 
 	// ─── WebSocket Hub ────────────────────────────────────────────────
 	hub := ws.NewHub(rdb)
+	pendingStore := ws.NewPendingStore(hub)
 	// Subscribe Redis patterns สำหรับ multi-instance
 	ctx := context.Background()
 	hub.SubscribePattern(ctx, ws.ChannelRestaurant+"*")
 	hub.Subscribe(ctx, ws.ChannelRiders)
 	hub.SubscribePattern(ctx, ws.ChannelCustomer+"*")
 
-	// ─── Repositories ─────────────────────────────────────────────────
+	// ─── Repositories ─────────────────────────────────────────────────────
 	authRepo := repositories.NewAuthRepository(db)
 	restaurantRepo := repositories.NewRestaurantRepository(db)
 	menuItemRepo := repositories.NewMenuItemRepository(db)
@@ -61,12 +62,12 @@ func main() {
 	orderService := service.NewOrderService(orderRepo, menuItemRepo, restaurantRepo, addressRepo)
 	reviewService := service.NewReviewService(reviewRepo, orderRepo, restaurantRepo)
 
-	// ─── Handlers ─────────────────────────────────────────────────────
+	// ─── Handlers ───────────────────────────────────────────────────────
 	authHandler := handlers.NewAuthHandler(authService, cfg)
 	restaurantHandler := handlers.NewRestaurantHandler(restaurantService)
 	menuItemHandler := handlers.NewMenuHandler(menuItemService)
 	addressHandler := handlers.NewAddressHandler(addressService)
-	orderHandler := handlers.NewOrdersHandler(orderService, hub)
+	orderHandler := handlers.NewOrdersHandler(orderService, hub, pendingStore, menuItemRepo, restaurantRepo, addressRepo)
 	reviewHandler := handlers.NewReviewHandler(reviewService)
 	wsHandler := handlers.NewWSHandler(hub)
 
@@ -100,6 +101,9 @@ func main() {
 	api.Get("/food-types", restaurantHandler.GetFoodTypes)
 	api.Get("/menu/:restaurant_id", middleware.OptionalAuth(cfg), menuItemHandler.GetMenuItemAllByID)
 	api.Get("/reviews/restaurant/:restaurant_id", reviewHandler.GetReviewsByRestaurant)
+	api.Get("/reviews/riders", reviewHandler.GetRiderStats)
+	api.Get("/reviews/rider/user/:rider_id", reviewHandler.GetRiderReviews)
+	api.Get("/orders/global/sell-best", orderHandler.GetGlobalSellBest)
 
 	// ─── Protected routes (ต้อง login) ─────────────────────────────────
 	auth := api.Group("/", middleware.AuthRequired(cfg))
@@ -133,6 +137,8 @@ func main() {
 	review.Post("/", reviewHandler.CreateReview)
 	review.Put("/:id", reviewHandler.UpdateReview)
 	review.Delete("/:id", reviewHandler.DeleteReview)
+	review.Post("/rider", reviewHandler.CreateRiderReview)
+	auth.Get("/reviews/rider/order/:order_id", reviewHandler.GetRiderReviewByOrder)
 
 	// ─── Order routes ─────────────────────────────────────────────────
 	order := api.Group("/orders", middleware.AuthRequired(cfg))
@@ -140,25 +146,31 @@ func main() {
 	order.Post("/", middleware.RoleRequired("user"), orderHandler.CreateOrder)
 	order.Get("/my", middleware.RoleRequired("user"), orderHandler.GetMyOrders)
 	order.Patch("/cancel/:id", middleware.RoleRequired("user"), orderHandler.CancelOrder)
-	// Restaurant
+	// Restaurant (ดูออเดอร์เท่านั้น — ไม่มีการเปลี่ยนสถานะ)
 	order.Get("/restaurant", middleware.RoleRequired("rest"), orderHandler.GetRestaurantOrders)
-	order.Patch("/accept/:id", middleware.RoleRequired("rest"), orderHandler.AcceptOrder)
-	order.Patch("/reject/:id", middleware.RoleRequired("rest"), orderHandler.RejectOrder)
-	order.Patch("/prepare/:id", middleware.RoleRequired("rest"), orderHandler.PrepareOrder)
-	order.Patch("/ready/:id", middleware.RoleRequired("rest"), orderHandler.ReadyOrder)
-	// Rider
-	order.Get("/ready", middleware.RoleRequired("rider"), orderHandler.GetReadyOrders)
+	// Rider — ควบคุมสถานะทั้งหมด
 	order.Get("/rider/my", middleware.RoleRequired("rider"), orderHandler.GetRiderOrders)
-	order.Patch("/pickup/:id", middleware.RoleRequired("rider"), orderHandler.PickUpOrder)
-	order.Patch("/deliver/:id", middleware.RoleRequired("rider"), orderHandler.DeliverOrder)
+	order.Patch("/at-restaurant/:id", middleware.RoleRequired("rider"), orderHandler.MarkAtRestaurant)
+	order.Patch("/delivering/:id", middleware.RoleRequired("rider"), orderHandler.MarkDelivering)
+	order.Patch("/delivered/:id", middleware.RoleRequired("rider"), orderHandler.MarkDelivered)
+	// Pending orders (รอ rider รับงาน — real-time)
+	order.Post("/pending", middleware.RoleRequired("user"), orderHandler.CreatePendingOrder)
+	order.Delete("/pending/:pending_id", middleware.RoleRequired("user"), orderHandler.CancelPendingOrder)
+	order.Get("/pending/my", middleware.RoleRequired("user"), orderHandler.GetMyPendingOrders)
+	order.Get("/pending/all", middleware.RoleRequired("rider"), orderHandler.GetAllPendingOrders)
+	order.Post("/pending/:pending_id/accept", middleware.RoleRequired("rider"), orderHandler.AcceptPendingOrder)
+	
+	// named routes (ต้องอยู่ก่อน /:id)
+	order.Get("/sell-best", middleware.RoleRequired("rest"), orderHandler.GetOrderSellBest)
+	
 	// Detail (ต้องอยู่หลัง named routes ไม่งั้น /:id จะ match ก่อน)
 	order.Get("/:id", orderHandler.GetOrderByID)
 
 	// ─── WebSocket routes ─────────────────────────────────────────────
 	wsGroup := app.Group("/ws", wsHandler.UpgradeCheck())
 	wsGroup.Get("/restaurant/:restaurant_id", wsHandler.RestaurantWS())
-	wsGroup.Get("/rider", wsHandler.RiderWS())
-	wsGroup.Get("/customer", wsHandler.CustomerWS())
+	wsGroup.Get("/rider", middleware.AuthRequired(cfg), wsHandler.RiderWS())
+	wsGroup.Get("/customer", middleware.AuthRequired(cfg), wsHandler.CustomerWS())
 
 	fmt.Printf("server is running on port %s\n", cfg.App.Port)
 	if err := app.Listen(fmt.Sprintf(":%s", cfg.App.Port)); err != nil {

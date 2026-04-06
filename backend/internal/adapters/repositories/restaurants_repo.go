@@ -26,7 +26,9 @@ func (r *RestaurantRepository) CreateRestaurant(ctx context.Context, restaurant 
 
 func (r *RestaurantRepository) FindRestaurantByID(ctx context.Context, id int) (*domain.Restaurant, error) {
 	var restaurant domain.Restaurant
-	if err := r.db.WithContext(ctx).First(&restaurant, id).Error; err != nil {
+	if err := r.db.WithContext(ctx).
+		Select("restaurants.*, (SELECT COALESCE(AVG(reviews.rating), 0)::double precision FROM reviews WHERE reviews.restaurant_id = restaurants.id) as average_rating").
+		First(&restaurant, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
@@ -56,7 +58,6 @@ func (r *RestaurantRepository) EditRestaurant(ctx context.Context, restaurant *d
 		"lng":         restaurant.Lng,
 		"image_url":   restaurant.Image_url,
 		"food_type":   restaurant.Food_type,
-		"is_active":   restaurant.Is_active,
 	}
 
 	result := r.db.WithContext(ctx).Model(&domain.Restaurant{}).Where("id = ?", restaurant.ID).Updates(updates)
@@ -85,7 +86,9 @@ func (r *RestaurantRepository) FindAllRestaurants(ctx context.Context, page int,
 
 	// Apply pagination
 	offset := (page - 1) * limit
-	if err := query.Offset(offset).Limit(limit).Find(&restaurants).Error; err != nil {
+	if err := query.
+		Select("restaurants.*, (SELECT COALESCE(AVG(reviews.rating), 0)::double precision FROM reviews WHERE reviews.restaurant_id = restaurants.id) as average_rating").
+		Offset(offset).Limit(limit).Find(&restaurants).Error; err != nil {
 		return nil, 0, err
 	}
 

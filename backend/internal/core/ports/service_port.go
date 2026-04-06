@@ -20,6 +20,7 @@ type LoginRequest struct {
 }
 
 type InfoResponse struct {
+	ID     int    `json:"id"`
 	Name   string `json:"name"`
 	Email  string `json:"email"`
 	Role   string `json:"role"`
@@ -99,7 +100,6 @@ type EditRestaurantRequest struct {
 	Lng         float64 `json:"lng"`
 	ImageUrl    string  `json:"image_url"`
 	FoodType    string  `json:"food_type"`
-	IsActive    bool    `json:"is_active"`
 }
 
 type RestaurantServicePort interface {
@@ -159,22 +159,22 @@ type CreateOrderRequest struct {
 
 type OrderServicePort interface {
 	CreateOrder(ctx context.Context, customerID int, req CreateOrderRequest) (*domain.Order, error)
+	CreateOrderDirect(ctx context.Context, order *domain.Order) error // บันทึก order ที่สร้างแล้วตรงๆ (ใช้ตอน rider accept pending)
 	GetOrderByID(ctx context.Context, orderID int) (*domain.Order, error)
 	GetOrderByIDWithAuth(ctx context.Context, orderID int, userID int, role string) (*domain.Order, error)
 	GetOrdersByCustomerID(ctx context.Context, customerID int) ([]*domain.Order, error)
 	GetOrdersByRestaurantOwnerID(ctx context.Context, ownerID int) ([]*domain.Order, error)
-	// Restaurant actions
-	AcceptOrder(ctx context.Context, ownerID int, orderID int) error
-	RejectOrder(ctx context.Context, ownerID int, orderID int) error
-	PrepareOrder(ctx context.Context, ownerID int, orderID int) error
-	ReadyOrder(ctx context.Context, ownerID int, orderID int) error
-	// Rider actions
-	GetReadyOrders(ctx context.Context) ([]*domain.Order, error)
+	// Rider actions — Rider ควบคุมสถานะทั้งหมด
 	GetOrdersByRiderID(ctx context.Context, riderID int) ([]*domain.Order, error)
-	PickUpOrder(ctx context.Context, riderID int, orderID int) error
-	DeliverOrder(ctx context.Context, riderID int, orderID int) error
+	MarkAtRestaurant(ctx context.Context, riderID int, orderID int) error // picking_up → at_restaurant
+	MarkDelivering(ctx context.Context, riderID int, orderID int) error   // at_restaurant → delivering (ร้านได้เงิน)
+	MarkDelivered(ctx context.Context, riderID int, orderID int) error    // delivering → delivered (rider ได้เงิน)
 	// Cancel
 	CancelOrder(ctx context.Context, userID int, orderID int) error
+
+	// เมนูขายดีที่สุด by ร้านค้า (Aggregation)
+	GetBestSellingItems(ctx context.Context, ownerID int) ([]*domain.BestSellerItem, error)
+	GetGlobalBestSellingItems(ctx context.Context, limit int) ([]*domain.BestSellerItem, error)
 }
 
 // ─── Review ───────────────────────────────────────────────────────────
@@ -190,9 +190,21 @@ type UpdateReviewRequest struct {
 	Comment string `json:"comment"`
 }
 
+type CreateRiderReviewRequest struct {
+	OrderID int    `json:"order_id" validate:"required"`
+	Rating  int    `json:"rating" validate:"required,min=1,max=5"`
+	Comment string `json:"comment"`
+}
+
 type ReviewServicePort interface {
 	CreateReview(ctx context.Context, customerID int, req CreateReviewRequest) (*domain.Review, error)
 	GetReviewsByRestaurantID(ctx context.Context, restaurantID int) ([]*domain.Review, error)
 	UpdateReview(ctx context.Context, customerID int, reviewID int, req UpdateReviewRequest) (*domain.Review, error)
 	DeleteReview(ctx context.Context, customerID int, reviewID int) error
+
+	// Rider Reviews
+	CreateRiderReview(ctx context.Context, customerID int, req CreateRiderReviewRequest) (*domain.ReviewRider, error)
+	GetRiderReviewsByRiderID(ctx context.Context, riderID int) ([]*domain.ReviewRider, error)
+	GetRiderReviewByOrderID(ctx context.Context, orderID int) (*domain.ReviewRider, error)
+	GetAllRiderStats(ctx context.Context) ([]*domain.RiderStat, error)
 }

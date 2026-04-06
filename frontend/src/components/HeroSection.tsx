@@ -1,12 +1,32 @@
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useRestaurantStore } from "../store/useRestaurantStore";
+import { orderService, type BestSellerItem } from "../services/order-service";
 
-const HERO_FOOD_IMAGE = "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80";
-const HERO_RESTAURANT_IMAGE = "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=600&q=80";
+const ERROR_FOOD_IMAGE = "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80";
+const ERROR_RESTAURANT_IMAGE = "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=600&q=80";
 
 export default function HeroSection() {
   const { searchTerm, setSearchTerm, setSelectedFoodType } = useRestaurantStore();
   const navigate = useNavigate();
+  const [bestSeller, setBestSeller] = useState<BestSellerItem | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchBestSeller() {
+      try {
+        const items = await orderService.getGlobalBestSellingItems(1);
+        if (items && items.length > 0) {
+          setBestSeller(items[0]);
+        }
+      } catch (err) {
+        console.error("Failed to fetch global best seller:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchBestSeller();
+  }, []);
 
   const handleSearch = () => {
     setSelectedFoodType(null); // Clear category filter for global search
@@ -77,11 +97,14 @@ export default function HeroSection() {
           style={{ animationDelay: "0.5s" }}
         >
           {/* รูปใหญ่ — เมนูอาหารที่ฮิตที่สุด */}
-          <div className="aspect-4/5 rounded-xl overflow-hidden relative shadow-2xl shadow-on-surface/5 transform hover:scale-[1.01] transition-transform duration-700">
+          <div 
+            className="aspect-4/5 rounded-xl overflow-hidden relative shadow-2xl shadow-on-surface/5 transform hover:scale-[1.01] transition-transform duration-700 cursor-pointer"
+            onClick={() => bestSeller && navigate(`/restaurant/shop-${bestSeller.restaurant_id}`)}
+          >
             <img
               className="w-full h-full object-cover"
-              alt="เมนูยอดนิยมประจำสัปดาห์"
-              src={HERO_FOOD_IMAGE}
+              alt={bestSeller?.name || "เมนูยอดนิยมประจำสัปดาห์"}
+              src={bestSeller?.image_url || ERROR_FOOD_IMAGE}
             />
             <div className="absolute inset-0 bg-linear-to-t from-on-surface/40 via-transparent to-transparent" />
 
@@ -96,10 +119,10 @@ export default function HeroSection() {
                 </span>
                 <div>
                   <p className="font-headline font-bold text-on-surface text-base">
-                    เมนูยอดนิยมวันนี้
+                    {bestSeller?.name || "กำลังโหลดเมนูฮิต..."}
                   </p>
                   <p className="text-on-surface-variant text-sm">
-                    คัดสรรเมนูฮิตจากร้านดังทั่วกรุงเทพ
+                    {loading ? "กำลังค้นโหมดอาหารยอดนิยม" : `เมนูขายดีที่สุดในระบบ (${bestSeller?.sales || 0} ออเดอร์)`}
                   </p>
                 </div>
               </div>
@@ -108,18 +131,19 @@ export default function HeroSection() {
 
           {/* รูปเล็ก — บรรยากาศร้านอาหาร */}
           <div
-            className="absolute -bottom-10 -left-10 w-56 h-56 rounded-xl overflow-hidden border-[6px] border-surface shadow-2xl hidden md:block animate-fade-in-up"
+            className="absolute -bottom-10 -left-10 w-56 h-56 rounded-xl overflow-hidden border-[6px] border-surface shadow-2xl hidden md:block animate-fade-in-up hover:scale-105 transition-transform duration-500 cursor-pointer"
             style={{ animationDelay: "0.7s" }}
+            onClick={() => bestSeller && navigate(`/restaurant/shop-${bestSeller.restaurant_id}`)}
           >
             <img
               className="w-full h-full object-cover"
               alt="บรรยากาศร้านอาหารชั้นนำ"
-              src={HERO_RESTAURANT_IMAGE}
+              src={bestSeller?.restaurant_image_url || ERROR_RESTAURANT_IMAGE}
             />
             {/* Floating label */}
-            <div className="absolute bottom-0 inset-x-0 bg-on-surface/60 backdrop-blur px-3 py-2 text-center">
-              <p className="text-white text-xs font-bold tracking-wider">
-                🏆 ร้านดังแนะนำ
+            <div className="absolute bottom-0 inset-x-0 bg-secondary/80 backdrop-blur px-3 py-2 text-center">
+              <p className="text-white text-[10px] font-black uppercase tracking-widest">
+                🏆 ร้านแนะนำ
               </p>
             </div>
           </div>

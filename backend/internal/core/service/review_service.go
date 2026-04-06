@@ -53,7 +53,7 @@ func (s *ReviewService) CreateReview(ctx context.Context, customerID int, req po
 		OrderID:      req.OrderID,
 		CustomerID:   customerID,
 		RestaurantID: order.RestaurantID,
-		Rating:       req.Rating,
+		Rating:       int64(req.Rating),
 		Comment:      req.Comment,
 	}
 
@@ -77,7 +77,7 @@ func (s *ReviewService) UpdateReview(ctx context.Context, customerID int, review
 	if review == nil || review.CustomerID != customerID {
 		return nil, errors.New("review not found")
 	}
-	review.Rating = req.Rating
+	review.Rating = int64(req.Rating)
 	review.Comment = req.Comment
 	if err := s.reviewRepo.Update(ctx, review); err != nil {
 		return nil, err
@@ -88,4 +88,53 @@ func (s *ReviewService) UpdateReview(ctx context.Context, customerID int, review
 // DeleteReview — ลูกค้าลบรีวิวของตัวเอง
 func (s *ReviewService) DeleteReview(ctx context.Context, customerID int, reviewID int) error {
 	return s.reviewRepo.Delete(ctx, reviewID, customerID)
+}
+
+// ─── Rider reviews ──────────────────────────────────────────────────
+
+func (s *ReviewService) CreateRiderReview(ctx context.Context, customerID int, req ports.CreateRiderReviewRequest) (*domain.ReviewRider, error) {
+	order, err := s.orderRepo.FindOrderByID(ctx, req.OrderID)
+	if err != nil {
+		return nil, err
+	}
+	if order == nil || order.CustomerID != customerID {
+		return nil, errors.New("order not found")
+	}
+	if order.Status != domain.OrderStatusDelivered {
+		return nil, errors.New("can only review rider after delivery")
+	}
+	if order.RiderID == nil {
+		return nil, errors.New("no rider assigned to this order")
+	}
+
+	// ตรวจว่ายังไม่เคยรีวิวไรเดอร์ในออเดอร์นี้
+	existing, _ := s.reviewRepo.FindRiderReviewByOrderID(ctx, req.OrderID)
+	if existing != nil {
+		return nil, errors.New("you already reviewed the rider for this order")
+	}
+
+	review := &domain.ReviewRider{
+		OrderID:    req.OrderID,
+		CustomerID: customerID,
+		RiderID:    *order.RiderID,
+		Rating:     int64(req.Rating),
+		Comment:    req.Comment,
+	}
+
+	if err := s.reviewRepo.CreateRiderReview(ctx, review); err != nil {
+		return nil, err
+	}
+	return review, nil
+}
+
+func (s *ReviewService) GetRiderReviewsByRiderID(ctx context.Context, riderID int) ([]*domain.ReviewRider, error) {
+	return s.reviewRepo.FindRiderReviewsByRiderID(ctx, riderID)
+}
+
+func (s *ReviewService) GetRiderReviewByOrderID(ctx context.Context, orderID int) (*domain.ReviewRider, error) {
+	return s.reviewRepo.FindRiderReviewByOrderID(ctx, orderID)
+}
+
+func (s *ReviewService) GetAllRiderStats(ctx context.Context) ([]*domain.RiderStat, error) {
+	return s.reviewRepo.FindAllRiderStats(ctx)
 }

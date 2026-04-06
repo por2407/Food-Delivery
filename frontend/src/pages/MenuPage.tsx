@@ -7,6 +7,7 @@ import type { Restaurant, MenuItem } from "../types/restaurant";
 import { decodeId } from "../lib/obfuscator";
 import { useCartStore } from "../store/useCartStore";
 import { useAuthStore } from "../store/useAuthStore";
+import { reviewService, type Review } from "../services/review-service";
 
 export default function MenuPage() {
   const { id: slugAndId } = useParams<{ id: string }>();
@@ -18,7 +19,9 @@ export default function MenuPage() {
 
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<"menu" | "reviews">("menu");
 
   const { 
     bills, 
@@ -37,12 +40,14 @@ export default function MenuPage() {
     if (!realId) return;
     async function fetchData() {
       try {
-        const [resData, menuData] = await Promise.all([
+        const [resData, menuData, reviewData] = await Promise.all([
           restaurantService.getById(realId),
           restaurantService.getMenuItems(realId),
+          reviewService.getReviewsByRestaurant(realId),
         ]);
         setRestaurant(resData);
         setMenuItems(menuData);
+        setReviews(reviewData.data);
       } catch (err) {
         console.error("Failed to fetch restaurant details", err);
       } finally {
@@ -115,15 +120,36 @@ export default function MenuPage() {
                  </div>
                  <div className="flex items-center gap-3 bg-white/5 backdrop-blur-md px-5 py-3 rounded-2xl border border-white/10">
                     <span className="material-symbols-outlined text-emerald-400 text-xl">payments</span>
-                    <span>จัดส่ง ฿20</span>
+                    <span>จัดส่ง 10%</span>
                  </div>
               </div>
           </div>
         </section>
 
-        {/* ── Menu Content ── */}
+        {/* ── Tabs Navigation ── */}
+        <section className="border-b border-outline-variant/20 sticky top-[72px] bg-surface/80 backdrop-blur-xl z-30">
+          <div className="max-w-7xl mx-auto px-6 flex gap-12">
+             <button 
+               onClick={() => setActiveTab("menu")}
+               className={`py-6 text-sm font-black uppercase tracking-widest transition-all relative ${activeTab === 'menu' ? 'text-primary' : 'text-on-surface-variant'}`}
+             >
+                เมนูอาหาร
+                {activeTab === 'menu' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary rounded-t-full shadow-[0_-4px_12px_rgba(var(--color-primary),0.4)]" />}
+             </button>
+             <button 
+               onClick={() => setActiveTab("reviews")}
+               className={`py-6 text-sm font-black uppercase tracking-widest transition-all relative ${activeTab === 'reviews' ? 'text-primary' : 'text-on-surface-variant'}`}
+             >
+                รีวิวจากลูกค้า ({reviews.length})
+                {activeTab === 'reviews' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary rounded-t-full shadow-[0_-4px_12px_rgba(var(--color-primary),0.4)]" />}
+             </button>
+          </div>
+        </section>
+
+        {/* ── Content Area ── */}
         <section className="px-6 py-16 max-w-7xl mx-auto">
-          {menuItems.length === 0 ? (
+          {activeTab === "menu" ? (
+            menuItems.length === 0 ? (
             <div className="py-32 text-center">
               <span className="material-symbols-outlined text-6xl text-outline-variant mb-4 font-thin">lunch_dining</span>
               <p className="text-xl text-on-surface-variant font-medium">ร้านนี้ยังไม่ได้เพิ่มเมนูอาหาร</p>
@@ -155,9 +181,16 @@ export default function MenuPage() {
                                  <p className="text-sm text-on-surface-variant line-clamp-2 mb-3 mt-1 leading-relaxed">
                                    {item.description || "เมนูแนะนำแสนอร่อย ปรุงสดใหม่ทุกวันเพื่อคุณ"}
                                  </p>
+                                 {item.rating && item.rating > 0 ? (
+                                   <div className="flex items-center gap-1.5 mb-3 bg-amber-500/10 w-fit px-2 py-0.5 rounded-full border border-amber-500/10">
+                                      <span className="material-symbols-outlined text-sm text-amber-500 fill-1">star</span>
+                                      <span className="text-[10px] font-black text-amber-600">{item.rating.toFixed(1)}</span>
+                                      <span className="text-[10px] opacity-40 font-black ml-1">({item.review_count})</span>
+                                   </div>
+                                 ) : null}
                                  <div className="mt-auto flex items-center justify-between">
                                     <span className="text-xl font-black text-primary">฿{item.price.toLocaleString()}</span>
-                                    {user?.role !== 'rest' && (
+                                    {!['rest', 'rider', 'admin'].includes(user?.role ?? '') && (
                                       inCart ? (
                                         <div className="flex items-center gap-2 bg-surface-container-high rounded-full px-2 py-1">
                                            <button 
@@ -202,7 +235,7 @@ export default function MenuPage() {
               </div>
 
               {/* ── Sticky Sidebar (Cart for THIS restaurant) ── */}
-              {user?.role !== 'rest' && (
+              {!['rest', 'rider', 'admin'].includes(user?.role ?? '') && (
                 <aside className="hidden lg:block">
                    <div className="sticky top-32 flex flex-col gap-6">
                       {/* Promo Card */}
@@ -274,6 +307,63 @@ export default function MenuPage() {
                    </div>
                 </aside>
               )}
+            </div>
+          )) : (
+            /* ── Reviews View ── */
+            <div className="max-w-3xl animate-fade-in-up">
+                {reviews.length === 0 ? (
+                   <div className="py-24 text-center bg-surface-container-lowest rounded-xl border border-outline-variant/10">
+                     <span className="material-symbols-outlined text-5xl text-outline-variant mb-4 font-thin">rate_review</span>
+                     <p className="text-lg text-on-surface-variant font-black italic">ยังไม่มีรีวิวสำหรับร้านนี้</p>
+                     <p className="text-xs text-on-surface-variant/60 uppercase tracking-widest mt-2">เป็นคนแรกที่รีวิวหลังสั่งอาหารสิ!</p>
+                  </div>
+               ) : (
+                  <div className="space-y-8">
+                     <div className="flex items-center gap-8 bg-primary/5 p-10 rounded-[3rem] border border-primary/10">
+                        <div className="text-center">
+                           <p className="text-6xl font-black text-primary italic leading-none">{reviews.reduce((acc, review) => acc + review.rating, 0) / reviews.length?.toFixed(1) || "0.0"}</p>
+                           <p className="text-[10px] font-black uppercase tracking-widest opacity-40 mt-2">คะแนนเฉลี่ย</p>
+                        </div>
+                        <div className="h-16 w-px bg-primary/20" />
+                        <div className="space-y-1 grow">
+                           <p className="text-lg font-black italic tracking-tight">เสียงตอบรับจากนักชิม</p>
+                           <p className="text-sm text-on-surface-variant font-medium">สัมผัสประสบการณ์จริงจากลูกค้าที่เคยใช้บริการจริงกับเรา</p>
+                        </div>
+                     </div>
+
+                     <div className="space-y-6">
+                        {reviews.sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).map((rev, idx) => (
+                           <div 
+                             key={rev.id} 
+                             className="p-8 bg-surface-container-lowest border border-outline-variant/10 rounded-[2.5rem] shadow-sm hover:shadow-md transition-all animate-fade-in-up"
+                             style={{ animationDelay: `${idx * 0.05}s` }}
+                           >
+                              <div className="flex justify-between items-start mb-6">
+                                 <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-surface-container-high flex items-center justify-center font-black text-primary italic">
+                                       {rev.customer?.name?.charAt(0).toUpperCase() || "?"}
+                                    </div>
+                                    <div>
+                                       <p className="font-black text-lg tracking-tight">{rev.customer?.name || "Customer"}</p>
+                                       <p className="text-[10px] font-black uppercase tracking-widest opacity-40">
+                                          {new Date(rev.created_at).toLocaleDateString()}
+                                       </p>
+                                    </div>
+                                 </div>
+                                 <div className="flex gap-0.5">
+                                    {[1, 2, 3, 4, 5].map(star => (
+                                       <span key={star} className={`material-symbols-outlined text-lg ${star <= rev.rating ? 'text-primary fill-1' : 'text-on-surface-variant/20'}`}>star</span>
+                                    ))}
+                                 </div>
+                              </div>
+                              <p className="text-on-surface font-medium leading-relaxed italic border-l-4 border-primary/20 pl-4 py-1">
+                                 "{rev.comment || "ไม่ได้ระบุความเห็นเพิ่มเติม"}"
+                              </p>
+                           </div>
+                        ))}
+                     </div>
+                  </div>
+               )}
             </div>
           )}
         </section>

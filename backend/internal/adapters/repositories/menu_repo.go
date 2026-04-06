@@ -57,7 +57,12 @@ func (r *MenuItemRepository) UpdateMenuOpenOrCloseStatus(ctx context.Context, me
 
 func (r *MenuItemRepository) FindMenuItemsByRestaurantID(ctx context.Context, restaurantID int) ([]*domain.MenuItem, error) {
 	var menuItems []*domain.MenuItem
-	if err := r.db.WithContext(ctx).Where("restaurant_id = ?", restaurantID).Find(&menuItems).Error; err != nil {
+	if err := r.db.WithContext(ctx).
+		Select("menu_items.*, "+
+			"(SELECT COALESCE(AVG(reviews.rating), 0)::double precision FROM reviews INNER JOIN order_items ON order_items.order_id = reviews.order_id WHERE order_items.menu_item_id = menu_items.id) as rating, "+
+			"(SELECT COUNT(reviews.id) FROM reviews INNER JOIN order_items ON order_items.order_id = reviews.order_id WHERE order_items.menu_item_id = menu_items.id) as review_count").
+		Where("restaurant_id = ?", restaurantID).
+		Find(&menuItems).Error; err != nil {
 		return nil, err
 	}
 	return menuItems, nil
@@ -65,7 +70,12 @@ func (r *MenuItemRepository) FindMenuItemsByRestaurantID(ctx context.Context, re
 
 func (r *MenuItemRepository) FindMenuItemsByRestaurantIDAvailable(ctx context.Context, restaurantID int) ([]*domain.MenuItem, error) {
 	var menuItems []*domain.MenuItem
-	if err := r.db.WithContext(ctx).Where("restaurant_id = ? AND is_available = true", restaurantID).Find(&menuItems).Error; err != nil {
+	if err := r.db.WithContext(ctx).
+		Select("menu_items.*, "+
+			"(SELECT COALESCE(AVG(reviews.rating), 0)::double precision FROM reviews INNER JOIN order_items ON order_items.order_id = reviews.order_id WHERE order_items.menu_item_id = menu_items.id) as rating, "+
+			"(SELECT COUNT(reviews.id) FROM reviews INNER JOIN order_items ON order_items.order_id = reviews.order_id WHERE order_items.menu_item_id = menu_items.id) as review_count").
+		Where("restaurant_id = ? AND is_available = true", restaurantID).
+		Find(&menuItems).Error; err != nil {
 		return nil, err
 	}
 	return menuItems, nil

@@ -11,6 +11,8 @@ import MenuPage from "./pages/MenuPage";
 import CheckoutPage from "./pages/CheckoutPage";
 import OrdersPage from "./pages/OrdersPage";
 import RestaurantAdminPage from "./pages/RestaurantAdminPage";
+import RiderDashboardPage from "./pages/RiderDashboardPage";
+import RiderReviewsPage from "./pages/RiderReviewsPage";
 import { useAuthStore } from "./store/useAuthStore";
 
 const router = createBrowserRouter([
@@ -45,6 +47,14 @@ const router = createBrowserRouter([
   {
     path: "/restaurant-admin",
     element: <RestaurantAdminPage />,
+  },
+  {
+    path: "/rider",
+    element: <RiderDashboardPage />,
+  },
+  {
+    path: "/rider-reviews",
+    element: <RiderReviewsPage />,
   },
 ]);
 

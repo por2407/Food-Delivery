@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import TopNavBar from "../components/TopNavBar";
 import Footer from "../components/Footer";
@@ -7,7 +7,8 @@ import MapPicker from "../components/MapPicker";
 import { useCartStore } from "../store/useCartStore";
 import { addressService, type Address } from "../services/address-service";
 import { useAuthStore } from "../store/useAuthStore";
-import { orderService } from "../services/order-service";
+import { orderService, type PendingOrder } from "../services/order-service";
+import { connectCustomerWS, type WSEvent } from "../services/ws-service";
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
@@ -20,6 +21,12 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState<number | null>(null);
+
+  // ─── Waiting for rider state ─────────────────────────────────────
+  const [waitingPending, setWaitingPending] = useState<PendingOrder | null>(null);
+  const [waitingSeconds, setWaitingSeconds] = useState(0);
+  const wsRef = useRef<WebSocket | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // New Address Form
   const [newLabel, setNewLabel] = useState("");
@@ -79,33 +86,75 @@ export default function CheckoutPage() {
     }
   };
 
+  // ─── WebSocket for customer waiting ──────────────────────────────
+  const connectWS = useCallback(() => {
+    if (wsRef.current) return;
+    const ws = connectCustomerWS((evt: WSEvent) => {
+      if (evt.type === "pending_order_accepted" || evt.type === "rider_accepted") {
+        // Rider accepted! Clean up and navigate
+        // Use event data for restaurant_id to avoid stale closure
+        const restaurantId = (evt.data as any)?.order?.restaurant_id;
+        if (restaurantId) clearBill(restaurantId);
+        setWaitingPending(null);
+        setWaitingSeconds(0);
+        if (timerRef.current) clearInterval(timerRef.current);
+        navigate("/orders");
+      }
+      if (evt.type === "pending_order_cancelled") {
+        setWaitingPending(null);
+        setWaitingSeconds(0);
+        if (timerRef.current) clearInterval(timerRef.current);
+      }
+    });
+    wsRef.current = ws;
+  }, [clearBill, navigate]);
+
+  // Cleanup WS + timer on unmount
+  useEffect(() => {
+    return () => {
+      if (wsRef.current) { wsRef.current.close(); wsRef.current = null; }
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    };
+  }, []);
+
   const handlePlaceOrderForBill = async (restaurantId: number, restaurantName: string, items: any[], note: string = "") => {
     if (!selectedAddress) { alert("กรุณาระบุที่อยู่สำหรับจัดส่ง"); return; }
-    
+
     setIsProcessing(restaurantId);
     try {
-      await orderService.createOrder({
+      // Connect WS before placing the order
+      connectWS();
+
+      const pending = await orderService.createPendingOrder({
         restaurant_id: restaurantId,
         address_id: selectedAddress.id,
         items: items.map(i => ({
           menu_item_id: i.id,
-          quantity: i.quantity
+          quantity: i.quantity,
         })),
-        note: note
+        note: note,
       });
-      
-      const currentBillsLength = bills.length;
-      clearBill(restaurantId);
-      alert(`สั่งซื้อจากร้าน "${restaurantName}" สำเร็จ! คุณสามารถติดตามสถานะอาหารได้ในหน้าประวัติการสั่งซื้อ`);
-      
-      if (currentBillsLength === 1) {
-        navigate("/orders");
-      }
+
+      setWaitingPending(pending);
+      setWaitingSeconds(0);
+      timerRef.current = setInterval(() => setWaitingSeconds(s => s + 1), 1000);
     } catch (err: any) {
-      alert(`ไม่สามารถสั่งซื้อได้: ${err.response?.data?.error || "เกิดข้อผิดพลาดในการเชื่อมต่อ"}`);
+      alert(`ไม่สามารถสั่งซื้อได้: ${err.message || "เกิดข้อผิดพลาดในการเชื่อมต่อ"}`);
     } finally {
       setIsProcessing(null);
     }
+  };
+
+  const handleCancelPending = async () => {
+    if (!waitingPending) return;
+    try {
+      await orderService.cancelPendingOrder(waitingPending.id);
+    } catch {
+      // even if the API fails, dismiss locally
+    }
+    setWaitingPending(null);
+    setWaitingSeconds(0);
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
   };
 
   if (authLoading || (!initialized && !user)) {
@@ -326,6 +375,64 @@ export default function CheckoutPage() {
           })}
         </div>
       </main>
+
+      {/* ⏳ WAITING FOR RIDER OVERLAY */}
+      {waitingPending && (
+        <div className="fixed inset-0 z-[100] bg-surface/95 backdrop-blur-xl flex items-center justify-center p-6">
+          <div className="max-w-md w-full text-center space-y-8 animate-fade-in-up">
+            {/* Animated pulse ring */}
+            <div className="relative mx-auto w-28 h-28">
+              <div className="absolute inset-0 rounded-full bg-primary/10 animate-ping" />
+              <div className="absolute inset-2 rounded-full bg-primary/20 animate-pulse" />
+              <div className="absolute inset-0 rounded-full flex items-center justify-center">
+                <span className="material-symbols-outlined text-5xl text-primary">delivery_dining</span>
+              </div>
+            </div>
+
+            <div>
+              <h2 className="text-2xl font-black font-headline text-on-surface mb-2">กำลังค้นหาไรเดอร์...</h2>
+              <p className="text-on-surface-variant font-medium text-sm">
+                ระบบกำลังส่งคำสั่งซื้อไปยังไรเดอร์ในพื้นที่ กรุณารอสักครู่
+              </p>
+            </div>
+
+            {/* Timer */}
+            <div className="text-4xl font-black font-mono text-primary tabular-nums">
+              {String(Math.floor(waitingSeconds / 60)).padStart(2, "0")}:{String(waitingSeconds % 60).padStart(2, "0")}
+            </div>
+
+            {/* Order summary card */}
+            <div className="bg-surface-container-lowest rounded-3xl p-6 text-left border border-outline-variant/10 shadow-lg">
+              <p className="text-xs font-black uppercase text-secondary tracking-widest mb-3">สรุปคำสั่งซื้อ</p>
+              <p className="font-bold text-on-surface mb-2">{waitingPending.restaurant_name}</p>
+              <div className="space-y-1 text-sm text-on-surface-variant">
+                {waitingPending.items.map((it, i) => (
+                  <div key={i} className="flex justify-between">
+                    <span>{it.name} × {it.quantity}</span>
+                    <span className="font-bold text-on-surface">฿{it.sub_total.toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="border-t border-outline-variant/10 mt-3 pt-3 flex justify-between text-sm">
+                <span className="text-on-surface-variant">ค่าจัดส่ง</span>
+                <span className="font-bold text-on-surface">฿{waitingPending.delivery_fee.toLocaleString()}</span>
+              </div>
+              <div className="border-t border-outline-variant/10 mt-2 pt-3 flex justify-between font-black text-base">
+                <span>รวมทั้งสิ้น</span>
+                <span className="text-primary">฿{(waitingPending.total_amount + waitingPending.delivery_fee).toLocaleString()}</span>
+              </div>
+            </div>
+
+            {/* Cancel button */}
+            <button
+              onClick={handleCancelPending}
+              className="w-full py-4 rounded-2xl border-2 border-error/30 text-error font-black text-sm hover:bg-error/5 transition-colors active:scale-95"
+            >
+              ยกเลิกคำสั่งซื้อ
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 📍 ADD ADDRESS MODAL */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="ระบุสถานที่จัดส่งอาหาร">

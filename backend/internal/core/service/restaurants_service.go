@@ -67,7 +67,6 @@ func (s *RestaurantService) EditRestaurant(ctx context.Context, restaurantID int
 		Lng:         req.Lng,
 		Image_url:   req.ImageUrl,
 		Food_type:   req.FoodType,
-		Is_active:   req.IsActive,
 	}
 
 	if err := s.restaurantRepo.EditRestaurant(ctx, updated); err != nil {

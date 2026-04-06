@@ -76,7 +76,7 @@ func (s *OrderService) CreateOrder(ctx context.Context, customerID int, req port
 		CustomerID:   customerID,
 		RestaurantID: req.RestaurantID,
 		AddressID:    req.AddressID,
-		Status:       domain.OrderStatusPending,
+		Status:       domain.OrderStatusPickingUp,
 		TotalAmount:  totalAmount,
 		DeliveryFee:  20, // ค่าส่งเริ่มต้น (ทำ dynamic ทีหลัง)
 		Note:         req.Note,
@@ -150,55 +150,12 @@ func (s *OrderService) GetOrdersByRestaurantOwnerID(ctx context.Context, ownerID
 	return s.orderRepo.FindOrdersByRestaurantID(ctx, rest.ID)
 }
 
-// ─── Restaurant actions ──────────────────────────────────────────────
-func (s *OrderService) updateOrderByOwner(ctx context.Context, ownerID int, orderID int, fromStatus, toStatus string) error {
-	order, err := s.orderRepo.FindOrderByID(ctx, orderID)
-	if err != nil {
-		return err
-	}
-	if order == nil {
-		return errors.New("order not found")
-	}
-	// ตรวจว่าเป็นเจ้าของร้าน
-	rest, err := s.restaurantRepo.FindRestaurantByID(ctx, order.RestaurantID)
-	if err != nil {
-		return err
-	}
-	if rest == nil || rest.OwnerID != ownerID {
-		return errors.New("forbidden: not your restaurant")
-	}
-	if order.Status != fromStatus {
-		return fmt.Errorf("order status must be '%s' (current: '%s')", fromStatus, order.Status)
-	}
-	return s.orderRepo.UpdateOrderStatus(ctx, orderID, toStatus)
-}
+// ═══════════════════════════════════════════════════════════════════════
+// Rider actions — Rider ควบคุมสถานะทั้งหมด
+// ═══════════════════════════════════════════════════════════════════════
 
-func (s *OrderService) AcceptOrder(ctx context.Context, ownerID int, orderID int) error {
-	return s.updateOrderByOwner(ctx, ownerID, orderID, domain.OrderStatusPending, domain.OrderStatusAccepted)
-}
-
-func (s *OrderService) RejectOrder(ctx context.Context, ownerID int, orderID int) error {
-	return s.updateOrderByOwner(ctx, ownerID, orderID, domain.OrderStatusPending, domain.OrderStatusCancelled)
-}
-
-func (s *OrderService) PrepareOrder(ctx context.Context, ownerID int, orderID int) error {
-	return s.updateOrderByOwner(ctx, ownerID, orderID, domain.OrderStatusAccepted, domain.OrderStatusPreparing)
-}
-
-func (s *OrderService) ReadyOrder(ctx context.Context, ownerID int, orderID int) error {
-	return s.updateOrderByOwner(ctx, ownerID, orderID, domain.OrderStatusPreparing, domain.OrderStatusReady)
-}
-
-// ─── Rider actions ───────────────────────────────────────────────────
-func (s *OrderService) GetReadyOrders(ctx context.Context) ([]*domain.Order, error) {
-	return s.orderRepo.FindOrdersByStatus(ctx, domain.OrderStatusReady)
-}
-
-func (s *OrderService) PickUpOrder(ctx context.Context, riderID int, orderID int) error {
-	return s.orderRepo.AssignRider(ctx, orderID, riderID)
-}
-
-func (s *OrderService) DeliverOrder(ctx context.Context, riderID int, orderID int) error {
+// updateOrderByRider — helper: เปลี่ยนสถานะออเดอร์โดย rider + ตรวจว่าเป็น rider เจ้าของ
+func (s *OrderService) updateOrderByRider(ctx context.Context, riderID int, orderID int, fromStatus, toStatus string) error {
 	order, err := s.orderRepo.FindOrderByID(ctx, orderID)
 	if err != nil {
 		return err
@@ -209,10 +166,25 @@ func (s *OrderService) DeliverOrder(ctx context.Context, riderID int, orderID in
 	if order.RiderID == nil || *order.RiderID != riderID {
 		return errors.New("forbidden: not your order")
 	}
-	if order.Status != domain.OrderStatusPickedUp {
-		return fmt.Errorf("order status must be '%s' (current: '%s')", domain.OrderStatusPickedUp, order.Status)
+	if order.Status != fromStatus {
+		return fmt.Errorf("order status must be '%s' (current: '%s')", fromStatus, order.Status)
 	}
-	return s.orderRepo.UpdateOrderStatus(ctx, orderID, domain.OrderStatusDelivered)
+	return s.orderRepo.UpdateOrderStatus(ctx, orderID, toStatus)
+}
+
+// MarkAtRestaurant — rider ถึงร้านแล้ว รอรับอาหาร
+func (s *OrderService) MarkAtRestaurant(ctx context.Context, riderID int, orderID int) error {
+	return s.updateOrderByRider(ctx, riderID, orderID, domain.OrderStatusPickingUp, domain.OrderStatusAtRestaurant)
+}
+
+// MarkDelivering — rider รับอาหารแล้ว กดเปลี่ยนเป็น "กำลังส่งของ" → ร้านได้เงิน
+func (s *OrderService) MarkDelivering(ctx context.Context, riderID int, orderID int) error {
+	return s.updateOrderByRider(ctx, riderID, orderID, domain.OrderStatusAtRestaurant, domain.OrderStatusDelivering)
+}
+
+// MarkDelivered — rider ส่งถึงลูกค้าแล้ว กดเปลี่ยนเป็น "เสร็จสิ้น" → rider ได้เงิน
+func (s *OrderService) MarkDelivered(ctx context.Context, riderID int, orderID int) error {
+	return s.updateOrderByRider(ctx, riderID, orderID, domain.OrderStatusDelivering, domain.OrderStatusDelivered)
 }
 
 // ─── Cancel ──────────────────────────────────────────────────────────
@@ -227,8 +199,25 @@ func (s *OrderService) CancelOrder(ctx context.Context, userID int, orderID int)
 	if order.CustomerID != userID {
 		return errors.New("forbidden: not your order")
 	}
-	if order.Status != domain.OrderStatusPending {
-		return errors.New("can only cancel pending orders")
+	if order.Status != domain.OrderStatusPickingUp {
+		return errors.New("can only cancel orders in picking_up status")
 	}
 	return s.orderRepo.UpdateOrderStatus(ctx, orderID, domain.OrderStatusCancelled)
+}
+
+// ─── CreateOrderDirect — บันทึก order ลง DB ตรงๆ (ใช้ตอน rider accept pending) ──
+func (s *OrderService) CreateOrderDirect(ctx context.Context, order *domain.Order) error {
+	return s.orderRepo.CreateOrder(ctx, order)
+}
+
+func (s *OrderService) GetBestSellingItems(ctx context.Context, ownerID int) ([]*domain.BestSellerItem, error) {
+	// 1. หา restaurantID ของเจ้าของร้านก่อน
+	restaurant, err := s.restaurantRepo.FindRestaurantByOwnerID(ctx, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	return s.orderRepo.FindBestSellingItems(ctx, restaurant.ID)
+}
+func (s *OrderService) GetGlobalBestSellingItems(ctx context.Context, limit int) ([]*domain.BestSellerItem, error) {
+	return s.orderRepo.FindGlobalBestSellingItems(ctx, limit)
 }

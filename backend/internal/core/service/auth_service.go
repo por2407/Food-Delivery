@@ -90,6 +90,7 @@ func (s *AuthService) Login(ctx context.Context, req ports.LoginRequest) (*ports
 	return &ports.LoginResponse{
 		AccessToken: accessToken,
 		Info: ports.InfoResponse{
+			ID:     user.ID,
 			Name:   user.Name,
 			Email:  user.Email,
 			Role:   user.Role,
@@ -114,6 +115,7 @@ func (s *AuthService) EditProfileByID(ctx context.Context, userID int, req ports
 	// ประกอบ response จาก req + JWT locals (email, role)
 	// ไม่ต้อง query DB อีกรอบ เพราะ email/role ไม่มีการเปลี่ยนแปลง
 	return &ports.InfoResponse{
+		ID:     userID,
 		Name:   req.Name,
 		Email:  req.Email,
 		Role:   req.Role,
@@ -188,6 +190,7 @@ func (s *AuthService) GetProfile(ctx context.Context, userID int) (*ports.InfoRe
 	}
 
 	return &ports.InfoResponse{
+		ID:     user.ID,
 		Name:   user.Name,
 		Email:  user.Email,
 		Role:   user.Role,
@@ -268,6 +271,7 @@ func (s *AuthService) GoogleCallback(ctx context.Context, code string) (*ports.L
 	return &ports.LoginResponse{
 		AccessToken: accessToken,
 		Info: ports.InfoResponse{
+			ID:     user.ID,
 			Name:   user.Name,
 			Email:  user.Email,
 			Role:   user.Role,

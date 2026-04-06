@@ -5,7 +5,7 @@ import Footer from "../components/Footer";
 import { useAuthStore } from "../store/useAuthStore";
 import Modal from "../components/Modal";
 import MapPicker from "../components/MapPicker";
-import { orderService, type Order } from "../services/order-service";
+import { orderService, type Order, type BestSellerItem } from "../services/order-service";
 import { restaurantService } from "../services/restaurant-service";
 import { menuService } from "../services/menu-service";
 import type { Restaurant, FoodType, MenuItem } from "../types/restaurant";
@@ -16,6 +16,7 @@ export default function RestaurantAdminPage() {
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [bestSellers, setBestSellers] = useState<BestSellerItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorStatus, setErrorStatus] = useState<"no_store" | "banned" | null>(null);
 
@@ -23,6 +24,8 @@ export default function RestaurantAdminPage() {
   const [showRestaurantModal, setShowRestaurantModal] = useState(false);
   const [isEditRestaurant, setIsEditRestaurant] = useState(false);
   const [showMenuModal, setShowMenuModal] = useState(false);
+  const [showOrderDetailModal, setShowOrderDetailModal] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [foodTypes, setFoodTypes] = useState<FoodType[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [editingMenuItemId, setEditingMenuItemId] = useState<number | null>(null);
@@ -42,38 +45,53 @@ export default function RestaurantAdminPage() {
   }, [user, initialized, navigate]);
 
   const fetchData = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+    
+    setLoading(true); // Ensure loading state is active when re-fetching
     try {
       const res = await restaurantService.getMyRestaurant();
 
       if (!res.has_restaurant) {
         setErrorStatus("no_store");
-        setLoading(false);
         return;
       }
 
       setRestaurant(res.data);
 
-      const [mItems, rOrders] = await Promise.all([
-        menuService.getMenuItemsByRestaurant(res.data.id),
-        orderService.getRestaurantOrders()
-      ]);
-       
-      setMenuItems(mItems);
-      setOrders(rOrders);
+      // Fetch menu and orders independently to avoid one failing taking down everything
+      menuService.getMenuItemsByRestaurant(res.data.id)
+        .then(setMenuItems)
+        .catch(err => console.error("Failed to fetch menu items", err));
+
+      orderService.getRestaurantOrders()
+        .then(setOrders)
+        .catch(err => console.error("Failed to fetch restaurant orders", err));
+
+      orderService.getBestSellingItems()
+        .then(setBestSellers)
+        .catch(err => console.error("Failed to fetch best selling items", err));
+
       setErrorStatus(null);
     } catch (err: any) {
       console.error("Failed to fetch restaurant data", err);
     } finally {
       setLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, restaurantService, menuService, orderService]);
 
   useEffect(() => {
-    if (initialized && user?.id) {
-       fetchData();
-       const intv = setInterval(fetchData, 30000);
-       return () => clearInterval(intv);
+    if (initialized) {
+      if (user?.id) {
+        fetchData();
+        const intv = setInterval(fetchData, 30000);
+        return () => clearInterval(intv);
+      } else {
+        // If initialized but no user, we stop loading so navigate takes over
+        setLoading(false);
+      }
     }
   }, [initialized, user?.id, fetchData]);
 
@@ -254,7 +272,7 @@ export default function RestaurantAdminPage() {
             <div className="xl:col-span-12 grid grid-cols-1 md:grid-cols-4 gap-6">
               {[
                 { label: "ออเดอร์วันนี้", val: orders.length, icon: "receipt_long", color: "bg-blue-50 text-blue-600" },
-                { label: "ยอดขายรวม", val: `฿${orders.reduce((s, o) => s + (o.total_amount || 0), 0).toLocaleString()}`, icon: "payments", color: "bg-emerald-50 text-emerald-600" },
+                { label: "ยอดขายรวม", val: `฿${orders.reduce((s, o) => ['delivering', 'delivered'].includes(o.status) ? s + (o.total_amount || 0) : s, 0).toLocaleString()}`, icon: "payments", color: "bg-emerald-50 text-emerald-600" },
                 { label: "เรตติ้ง", val: restaurant?.rating || "4.8", icon: "star", color: "bg-rose-50 text-rose-600" },
                 { label: "สถานะร้าน", val: restaurant?.is_active ? 'เปิดอยู่' : 'ปิดอยู่', icon: "sensors", color: restaurant?.is_active ? "bg-emerald-50 text-emerald-600" : "bg-outline-variant/10 text-outline-variant" },
               ].map((s, i) => (
@@ -286,20 +304,33 @@ export default function RestaurantAdminPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-outline-variant/5">
-                    {orders.map((order) => (
+                    {orders.map((order) => {
+                      const statusConfig: Record<string, { label: string; bg: string }> = {
+                        picking_up:    { label: "กำลังไปรับ",  bg: "bg-amber-100 text-amber-700" },
+                        at_restaurant: { label: "ถึงร้านแล้ว",   bg: "bg-purple-100 text-purple-700" },
+                        delivering:    { label: "กำลังส่ง",    bg: "bg-cyan-100 text-cyan-700" },
+                        delivered:     { label: "ส่งสำเร็จ",   bg: "bg-green-100 text-green-700" },
+                        cancelled:     { label: "ยกเลิก",      bg: "bg-rose-100 text-rose-700" },
+                      };
+                      const st = statusConfig[order.status] || { label: order.status, bg: "bg-gray-100 text-gray-700" };
+                      return (
                       <tr key={order.id}>
                         <td className="px-8 py-6 font-black text-sm">#{order.id}</td>
                         <td className="px-8 py-6 font-black text-sm">฿{order.total_amount.toLocaleString()}</td>
                         <td className="px-8 py-6">
-                           <span className="px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest bg-amber-100 text-amber-700">{order.status}</span>
+                           <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${st.bg}`}>{st.label}</span>
                         </td>
                         <td className="px-8 py-6 text-right">
-                          <button className="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center hover:bg-primary hover:text-on-primary transition-all">
+                          <button 
+                            onClick={() => { setSelectedOrder(order); setShowOrderDetailModal(true); }}
+                            className="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center hover:bg-primary hover:text-on-primary transition-all"
+                          >
                             <span className="material-symbols-outlined text-lg">visibility</span>
                           </button>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                     {orders.length === 0 && (
                       <tr><td colSpan={4} className="px-8 py-20 text-center opacity-30 font-black italic">ยังไม่มีออเดอร์</td></tr>
                     )}
@@ -372,25 +403,26 @@ export default function RestaurantAdminPage() {
                   <span className="material-symbols-outlined text-primary text-sm animate-pulse">trending_up</span>
                 </h4>
                 <div className="space-y-6 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                  {[
-                    { name: "พัดกะเพราเนื้อวากิวไข่ดาว", sales: 124, img: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=50&q=80" },
-                    { name: "ต้มยำกุ้งแม่น้ำ", sales: 86, img: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=50&q=80" },
-                    { name: "ส้มตำปูปลาร้า", sales: 72, img: "https://images.unsplash.com/photo-1559847844-d9bc26809071?auto=format&fit=crop&w=50&q=80" },
-                    { name: "ไก่ย่างสมุนไพร", sales: 65, img: "https://images.unsplash.com/photo-1594221708779-948215570291?auto=format&fit=crop&w=50&q=80" }
-                  ].map((m, i) => (
-                    <div key={i} className="flex justify-between items-center group">
-                       <div className="flex items-center gap-4">
-                          <img src={m.img} className="w-10 h-10 rounded-xl object-cover transition-transform group-hover:scale-110" />
+                  {bestSellers.length > 0 ? (
+                    bestSellers.map((item, i) => (
+                      <div key={i} className="flex justify-between items-center group">
+                        <div className="flex items-center gap-4">
+                          <img src={item.image_url} className="w-10 h-10 rounded-xl object-cover transition-transform group-hover:scale-110 shadow-sm" />
                           <div>
-                             <p className="text-xs font-bold line-clamp-1">{m.name}</p>
-                             <p className="text-[10px] opacity-60">{m.sales} ออเดอร์</p>
+                            <p className="text-xs font-bold line-clamp-1">{item.name}</p>
+                            <p className="text-[10px] opacity-60">{item.sales} ออเดอร์</p>
                           </div>
-                       </div>
-                       <div className="h-1.5 w-16 bg-surface-container-high rounded-full overflow-hidden shrink-0">
+                        </div>
+                        <div className="h-1.5 w-16 bg-outline-variant/10 rounded-full overflow-hidden shrink-0">
                           <div className="h-full bg-primary" style={{ width: `${Math.max(20, 100 - (i * 15))}%` }} />
-                       </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="py-12 text-center">
+                      <p className="text-xs italic opacity-40">ยังไม่มีข้อมูลการขาย</p>
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
             </div>
@@ -496,6 +528,81 @@ export default function RestaurantAdminPage() {
               </button>
             </div>
           </form>
+        </Modal>
+
+        {/* Order Detail Modal */}
+        <Modal isOpen={showOrderDetailModal} onClose={() => setShowOrderDetailModal(false)} title={`รายละเอียดออเดอร์ #${selectedOrder?.id}`}>
+          {selectedOrder && (
+            <div className="space-y-6">
+              <div className="bg-surface-container-high p-5 rounded-3xl space-y-4 border border-outline-variant/10">
+                 {/* Customer */}
+                 <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary shrink-0">
+                       <span className="material-symbols-outlined">person</span>
+                    </div>
+                    <div className="grow min-w-0">
+                       <p className="text-[10px] font-black uppercase tracking-widest opacity-40 leading-none mb-1">ลูกค้า</p>
+                       <p className="font-black text-lg leading-none mb-1">{selectedOrder.customer?.name}</p>
+                       <p className="text-xs text-on-surface-variant font-bold flex items-center gap-1.5">
+                         <span className="material-symbols-outlined text-sm">phone</span>
+                         {selectedOrder.customer?.phone || "-"}
+                       </p>
+                    </div>
+                 </div>
+
+                 {/* Rider */}
+                 {selectedOrder.rider_id && (
+                   <div className="flex items-center gap-4 pt-4 border-t border-outline-variant/10">
+                      <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center text-amber-600 shrink-0">
+                         <span className="material-symbols-outlined">delivery_dining</span>
+                      </div>
+                      <div className="grow min-w-0">
+                         <p className="text-[10px] font-black uppercase tracking-widest opacity-40 leading-none mb-1">ไรเดอร์</p>
+                         <p className="font-black text-base leading-none mb-1">{selectedOrder.rider?.name || `ไรเดอร์ #${selectedOrder.rider_id}`}</p>
+                         <p className="text-xs text-on-surface-variant font-bold flex items-center gap-1.5">
+                           <span className="material-symbols-outlined text-sm">phone</span>
+                           {selectedOrder.rider?.phone || "-"}
+                         </p>
+                      </div>
+                   </div>
+                 )}
+              </div>
+
+              <div>
+                <h5 className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-3 ml-1">รายการสั่งซื้อ</h5>
+                <div className="space-y-3">
+                   {selectedOrder.items?.map((item, i) => (
+                      <div key={i} className="flex justify-between text-sm bg-surface-container-low p-3 rounded-xl">
+                         <span className="font-bold text-on-surface">
+                            <span className="text-primary">{item.quantity}×</span> {item.name}
+                         </span>
+                         <span className="font-black">฿{(item.price * item.quantity).toLocaleString()}</span>
+                      </div>
+                   ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                 <div className="bg-surface-container-low p-4 rounded-2xl">
+                    <p className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-1">ยอดรวมทั้งหมด</p>
+                    <p className="text-xl font-black text-primary">฿{selectedOrder.total_amount.toLocaleString()}</p>
+                 </div>
+                 <div className="bg-surface-container-low p-4 rounded-2xl">
+                    <p className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-1">สถานะ</p>
+                    <p className="text-sm font-black">{selectedOrder.status}</p>
+                 </div>
+              </div>
+
+              {selectedOrder.note && (
+                <div className="bg-amber-50 p-4 rounded-xl border border-amber-100 italic text-sm text-amber-800">
+                   <p className="font-black text-[10px] uppercase tracking-widest mb-1 opacity-60">บันทึกเพิ่มเติม:</p>
+                   {selectedOrder.note}
+                </div>
+              )}
+
+              <button onClick={() => setShowOrderDetailModal(false)} className="w-full py-4 rounded-2xl bg-on-surface text-surface font-black italic">ปิด</button>
+            </div>
+          )}
         </Modal>
       </div>
     );

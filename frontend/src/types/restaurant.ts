@@ -36,4 +36,6 @@ export interface MenuItem {
   price: number;
   image_url: string;
   is_available: boolean;
+  rating?: number;
+  review_count?: number;
 }

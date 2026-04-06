@@ -14,7 +14,8 @@ type Restaurant struct {
 	Lng         float64   `gorm:"column:lng" json:"lng"`
 	Image_url   string    `gorm:"column:image_url" json:"image_url"`
 	Food_type   string    `gorm:"column:food_type" json:"food_type"`
-	Rating      float64   `gorm:"column:rating" json:"rating"`
+	Rating      float64   `gorm:"column:rating" json:"-"` // Hidden from JSON to use calculated one instead
+	AverageRating float64 `gorm:"-" json:"rating"`       // Calculated on the fly
 	Is_active   bool      `gorm:"column:is_active;default:true" json:"is_active"`
 	Status      string    `gorm:"column:status;default:Y" json:"status"`
 	CreatedAt   time.Time `gorm:"column:created_at" json:"created_at"`

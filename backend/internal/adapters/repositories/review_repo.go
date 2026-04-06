@@ -47,6 +47,7 @@ func (r *ReviewRepository) FindByOrderID(ctx context.Context, orderID int) (*dom
 func (r *ReviewRepository) FindByRestaurantID(ctx context.Context, restaurantID int) ([]*domain.Review, error) {
 	var reviews []*domain.Review
 	if err := r.db.WithContext(ctx).
+		Preload("Customer").
 		Where("restaurant_id = ?", restaurantID).
 		Order("created_at DESC").
 		Find(&reviews).Error; err != nil {
@@ -65,4 +66,44 @@ func (r *ReviewRepository) Delete(ctx context.Context, id int, customerID int) e
 		return errors.New("review not found")
 	}
 	return result.Error
+}
+
+func (r *ReviewRepository) CreateRiderReview(ctx context.Context, review *domain.ReviewRider) error {
+	return r.db.WithContext(ctx).Create(review).Error
+}
+
+func (r *ReviewRepository) FindRiderReviewByOrderID(ctx context.Context, orderID int) (*domain.ReviewRider, error) {
+	var review domain.ReviewRider
+	if err := r.db.WithContext(ctx).Where("order_id = ?", orderID).First(&review).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &review, nil
+}
+
+func (r *ReviewRepository) FindRiderReviewsByRiderID(ctx context.Context, riderID int) ([]*domain.ReviewRider, error) {
+	var reviews []*domain.ReviewRider
+	if err := r.db.WithContext(ctx).
+		Preload("Customer").
+		Where("rider_id = ?", riderID).
+		Order("created_at DESC").
+		Find(&reviews).Error; err != nil {
+		return nil, err
+	}
+	return reviews, nil
+}
+
+func (r *ReviewRepository) FindAllRiderStats(ctx context.Context) ([]*domain.RiderStat, error) {
+	var results []*domain.RiderStat
+	err := r.db.WithContext(ctx).
+		Table("users").
+		Select("users.id as rider_id, users.name as name, users.phone as phone, users.avatar as avatar, COALESCE(AVG(review_riders.rating), 0) as rating, COUNT(review_riders.id) as review_count").
+		Joins("LEFT JOIN review_riders ON review_riders.rider_id = users.id").
+		Where("users.role = ?", "rider").
+		Group("users.id, users.name, users.phone, users.avatar").
+		Order("rating DESC").
+		Scan(&results).Error
+	return results, err
 }
